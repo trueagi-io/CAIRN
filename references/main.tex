@@ -1,0 +1,481 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
+
+% Color scheme
+\definecolor{mettatype}{RGB}{0, 82, 147}
+\definecolor{mettafunc}{RGB}{0, 127, 87}
+\definecolor{mettacomment}{RGB}{108, 113, 196}
+\definecolor{primaryblue}{RGB}{0, 82, 147}
+\definecolor{accentgreen}{RGB}{0, 127, 87}
+
+% MeTTa-style code environment
+\usepackage{listings}
+\lstdefinestyle{metta}{
+    language=Lisp,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{mettatype}\bfseries,
+    commentstyle=\color{mettacomment}\itshape,
+    stringstyle=\color{mettafunc},
+    showstringspaces=false,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    backgroundcolor=\color{gray!5}
+}
+
+\newcommand{\metta}[1]{\texttt{\color{mettatype}#1}}
+\newcommand{\func}[1]{\texttt{\color{mettafunc}#1}}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{example}{Example}
+\newtheorem{remark}{Remark}
+
+\title{CAIRN Implementation Specs}
+
+\author{Rem}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We detail here the specs for a first realization of CAIRN, based on the materials developed during the SYNAPSE (SYstematic Neural-symbolic Attention Processing System Evaluation) research project. Following the assumption that attention allocation effectiveness can be quantified as the tradeoff between resource consumption and performance gain, this document provides a high level specification using MeTTa-like pseudocode, for now independent of any specific language version dependency.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Background}\label{sec:background}
+
+\subsection{SYNAPSE}
+
+The SYNAPSE framework addresses the critical challenge of evaluating attention mechanisms in AI systems by treating attention allocation as a resource management problem. This proof of concept establishes the theoretical and computational foundations for measuring attention effectiveness through the main ratio or tradeoff between performance gain and resource cost.
+
+\subsection{ECANs}
+
+An ECAN can be represented as a graph consisting of the following atomic entities:
+
+\begin{itemize}
+    \item Untyped nodes $A, B, C, \ldots$ representing concepts or knowledge items
+    \item Untyped links between nodes $d, e, f, \ldots$ representing basic associations
+    \item Typed links: HebbianLinks (H-links) and InverseHebbianLinks (IH-links)
+    \item Weights: Short-Term Importance (STI) and Long-Term Importance (LTI)
+    \item Assignment of STI/LTI weights to nodes
+    \item Probability values assigned to typed links
+    \item A forgetful operation to prune low-value atoms
+\end{itemize}
+
+The metaphor at hand is that STI and LTI form a pair of cryptocurrencies in a liquidity pool. The STI is subject to conservation (modulo inflation) of total value, making the dynamics drastically different from classical artificial neural networks and more compatible with bioinspired models. The LTI indicates the value the ECAN perceives in retaining the atom in memory (RAM).
+
+\section{Minimal Proof of Concept}\label{sec:minimal}
+
+\subsection{Resource Cost Functions}
+
+Resource costs are based on AF size and STI budget usage:
+\begin{itemize}
+    \item Size of AttentionalFocus
+    \item STI distribution
+    \item Number of active Hebbian links
+\end{itemize}
+
+\begin{lstlisting}[style=metta, caption=Ratio]
+(: measure-af-size-ratio (-> Number))
+(= (measure-af-size-ratio)
+    (let* (($af-size (count (get-af-members)))
+           ($total-atoms (count (get-all-atoms-with-bins)))
+           ($ratio (/ $af-size $total-atoms)))
+        $ratio))
+\end{lstlisting}
+
+\begin{lstlisting}[style=metta, caption=Concentration]
+(: measure-sti-concentration (-> Number))
+(= (measure-sti-concentration)
+    (let* (($af-members (get-af-members))
+           ($af-sti (sum (map get-sti $af-members)))
+           ($total-sti (sum (map get-sti (get-all-atoms))))
+           ($concentration (/ $af-sti $total-sti)))
+        $concentration))
+\end{lstlisting}
+
+\begin{lstlisting}[style=metta, caption=Density]
+(: measure-link-density (-> Number))
+(= (measure-link-density)
+    (let* (($af (get-af-members))
+           ($af-size (count $af))
+           ($af-links (count-af-internal-hebbian $af))
+           ($max-links (* $af-size (- $af-size 1)))
+           ($density (if (> $max-links 0)
+                        (/ $af-links $max-links)
+                        0)))
+        $density))
+\end{lstlisting}
+
+\subsection{Effectiveness Calculation}
+
+Primary reported effectiveness is \textbf{global} (baseline CIP $\to$ current).
+Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
+
+\begin{lstlisting}[style=metta, caption=Attention Effectiveness]
+(: calculate-effectiveness (-> CIPSnapshot CIPSnapshot Number))
+(= (calculate-effectiveness $from $to)
+    (let* (($perf-delta (aggregate-metric-delta $from $to))
+           ($resource-cost (total-resource-cost)))
+        (/ $perf-delta $resource-cost)))
+
+(: measure-local-effectiveness (-> CIPSnapshot CIPSnapshot Number))
+(= (measure-local-effectiveness $prev $curr)
+    (calculate-effectiveness $prev $curr))
+
+(: measure-global-effectiveness (-> CIPSnapshot CIPSnapshot Number))
+(= (measure-global-effectiveness $baseline $curr)
+    (calculate-effectiveness $baseline $curr))
+\end{lstlisting}
+
+\clearpage
+\begin{lstlisting}[style=metta, caption=Redundancy]
+(: test-redundancy-degradation (-> CIPSnapshot CIPSnapshot (List Atom) PerformanceReport))
+(= (test-redundancy-degradation $cip-prev $cip-curr $redundant-copies)
+    (let* (($baseline-perf (aggregate-metric-delta $cip-prev $cip-curr))
+           ($baseline-cost (total-resource-cost))
+           ($_ (add-atoms-to-space $redundant-copies))
+           ($degraded-cip (transition-to-next-cip $cip-curr))
+           ($degraded-perf (aggregate-metric-delta $cip-prev $degraded-cip))
+           ($overhead (- (total-resource-cost) $baseline-cost))
+           ($degradation-rate (/ (- $baseline-perf $degraded-perf) $overhead)))
+        (PerformanceReport redundancy-impact $degradation-rate)))
+\end{lstlisting}
+
+\section{ECAN Evaluation Pipeline}\label{sec:evaluation}
+
+\subsection{Minimal Viable Evaluation}
+
+\begin{lstlisting}[style=metta, caption=Coherence]
+(: measure-attention-coherence (-> Number))
+(= (measure-attention-coherence)
+    (measure-coherence (get-af-members)))
+\end{lstlisting}
+
+\begin{lstlisting}[style=metta, caption=Retention]
+(: measure-context-retention (-> CIPSnapshot CIPSnapshot Number))
+(= (measure-context-retention $prev-cip $curr-cip)
+    (let* (($prev-af (get-af-snapshot $prev-cip))
+           ($curr-af (get-af-snapshot $curr-cip))
+           ($overlap (count-overlap
+                       (map get-id $prev-af)
+                       (map get-id $curr-af)))
+           ($union-size (+ (count $prev-af)
+                          (- (count $curr-af) $overlap))))
+        (/ $overlap $union-size)))
+\end{lstlisting}
+
+\subsection{Phase I: Assessment}
+
+\begin{lstlisting}[style=metta, caption=Assessment]
+;; Distributed importance: Pearson(mean STI series, current LTI)
+;; over typeSpace / bank atoms
+(: measure-distributed-importance (-> Number))
+(= (measure-distributed-importance)
+    (let* (($atoms (get-all-atoms))
+           ($mean-stis (map
+               (lambda ($a) (average (get-sti-series $a)))
+               $atoms))
+           ($lti-values (map get-lti $atoms)))
+        (pearson-correlation $mean-stis $lti-values)))
+\end{lstlisting}
+
+\begin{lstlisting}[style=metta, caption=Assessment]
+;; Selective modulation: Var(STI) / ((max-min)^2 / 12)
+(: measure-selective-modulation (-> Number))
+(= (measure-selective-modulation)
+    (let* (($sti-values (map get-sti (get-all-atoms)))
+           ($variance (variance $sti-values))
+           ($span (- (maximum $sti-values) (minimum $sti-values)))
+           ($null-var (/ (* $span $span) 12)))
+        (if (> $null-var 0)
+            (/ $variance $null-var)
+            0)))
+\end{lstlisting}
+
+\begin{lstlisting}[style=metta, caption=Assessment]
+;; Connection ratio: AF-out Hebbian with target in AF / all AF-out Hebbian
+(: measure-connection-ratio (-> Number))
+(= (measure-connection-ratio)
+    (let* (($from-af (get-hebbian-links-from-af))
+           ($total (count $from-af))
+           ($internal (count-if
+               (lambda ($l) (atom-in-af (get-target $l)))
+               $from-af)))
+        (if (> $total 0)
+            (/ $internal $total)
+            0)))
+\end{lstlisting}
+
+\subsection{Phase II: Audits}
+
+\begin{lstlisting}[style=metta, caption=Audit]
+(: measure-preallocation-space (-> Number))
+(= (measure-preallocation-space)
+    (let* (($atoms (get-all-atoms))
+           ($sti-values (map get-sti $atoms))
+           ($min-sti (minimum $sti-values))
+           ($shifted (map (lambda ($s) (- $s $min-sti)) $sti-values))
+           ($total (sum $shifted))
+           ($distribution (map (lambda ($s) (/ $s $total)) $shifted))
+           ($entropy (shannon-entropy $distribution)))
+        (/ $entropy (log2 (count $atoms)))))
+\end{lstlisting}
+
+\clearpage
+\subsection{Phase III: Test Probing}
+
+\begin{lstlisting}[style=metta, caption=Trajectory Test]
+(: measure-cognitive-maintenance (-> (List CIPSnapshot) Number))
+(= (measure-cognitive-maintenance $cip-series)
+    (let* (($pairs (consecutive-pairs $cip-series))
+           ($overlaps (map (lambda ($pair)
+                             (measure-context-retention
+                               (first $pair) (second $pair)))
+                          $pairs)))
+        (average $overlaps)))
+\end{lstlisting}
+
+\begin{lstlisting}[style=metta, caption=Coordination Test]
+;; Glocal: geometric mean of local and cross-module coherence
+;; Modules: weighted Louvain over all Hebbian links (weights = STV means)
+(: measure-glocal-coordination (-> Number))
+(= (measure-glocal-coordination)
+    (let* (($hlinks (get-hebbian-links))
+           ($modules (identify-modules $hlinks))
+           ($local-coherence (average
+                               (map measure-coherence $modules)))
+           ($inter-links (inter-module-links $hlinks $modules))
+           ($link-probs (map get-probability $inter-links))
+           ($conjunctions (map
+               (lambda ($link)
+                   (temporal-conjunction
+                       (get-source $link)
+                       (get-target $link)))
+               $inter-links))
+           ($global-coherence
+               (pearson-correlation $link-probs $conjunctions)))
+        (sqrt (* $local-coherence $global-coherence))))
+\end{lstlisting}
+
+\subsection{Phase VIII: Benchmarking}
+
+\begin{lstlisting}[style=metta, caption=Effectiveness Benchmark]
+(: measure-gained-efficiency (-> CIPSnapshot CIPSnapshot
+                                 CIPSnapshot CIPSnapshot Number))
+(= (measure-gained-efficiency $base-prev $base-curr $opt-prev $opt-curr)
+    (let* (($baseline-eff (calculate-effectiveness $base-prev $base-curr))
+           ($optimized-eff (calculate-effectiveness $opt-prev $opt-curr)))
+        (/ (- $optimized-eff $baseline-eff) $baseline-eff)))
+\end{lstlisting}
+
+\clearpage
+\section{Developer Tools}
+
+\subsection{Time Series}
+
+\begin{lstlisting}[style=metta, caption=STI/LTI Time Series]
+;; Global partial maps from atom-id to list of values
+;; one entry appended per CIP transition
+(= sti-series (new-state (empty-map)))
+(= lti-series (new-state (empty-map)))
+
+;; Called at each CIP boundary before AtomSpace is updated
+(: record-cip-series (-> ()))
+(= (record-cip-series)
+    (map (lambda ($atom)
+             (let* (($id (get-id $atom))
+                    ($curr-sti (get-sti $atom))
+                    ($curr-lti (get-lti $atom))
+                    ($prev-sti (map-get (get-state sti-series) $id))
+                    ($prev-lti (map-get (get-state lti-series) $id)))
+                (set-state sti-series
+                    (map-put (get-state sti-series) $id
+                             (append $prev-sti $curr-sti)))
+                (set-state lti-series
+                    (map-put (get-state lti-series) $id
+                             (append $prev-lti $curr-lti)))))
+         (get-all-atoms)))
+
+(: get-sti-series (-> Atom (List Number)))
+(= (get-sti-series $atom)
+    (map-get (get-state sti-series) (get-id $atom)))
+
+(: get-lti-series (-> Atom (List Number)))
+(= (get-lti-series $atom)
+    (map-get (get-state lti-series) (get-id $atom)))
+\end{lstlisting}
+
+\subsection{Topological Analysis}
+
+\begin{lstlisting}[style=metta, caption=Persistent Homology]
+;; Clique-complex invariants (triangles + Betti 0/1/2 via mod-2 ranks)
+;; Incremental over Hebbian edge additions between CIPs
+(: persistent-homology-invariants (-> TopologyReport))
+(= (persistent-homology-invariants)
+    (let* (($edges (hlinks-to-edge-list))
+           ($report (topology-invariants $edges)))
+        (TopologyReport
+            (topology-triangles $report)
+            (topology-betti-0 $report)
+            (topology-betti-1 $report)
+            (topology-betti-2 $report))))
+\end{lstlisting}
+
+\subsection{Utilities}
+
+\begin{lstlisting}[style=metta, caption=Developers SDK]
+;; Time-averaged STI co-activation of two atoms over a CIP trajectory
+(: temporal-conjunction (-> Atom Atom Number))
+(= (temporal-conjunction $atom-i $atom-j)
+    (let* (($sti-i (get-sti-series $atom-i))
+           ($sti-j (get-sti-series $atom-j)))
+        (average (map * $sti-i $sti-j))))
+
+;; Coherence: (Pearson Correlation)
+(: measure-coherence (-> (List Atom) Number))
+(= (measure-coherence $atoms)
+    (let* (($hlinks (get-hebbian-links-within $atoms))
+           ($link-probs (map get-probability $hlinks))
+           ($conjunctions (map
+               (lambda ($link)
+                   (temporal-conjunction
+                       (get-source $link)
+                       (get-target $link)))
+               $hlinks)))
+        (pearson-correlation $link-probs $conjunctions)))
+\end{lstlisting}
+
+\subsection{CIP Records}
+
+\begin{lstlisting}[style=metta, caption=CIP Tracking]
+(: CIPSnapshot Type)
+(: CIPSnapshot (->
+    Number          ; CIP index (0 = baseline)
+    Number          ; timestamp
+    (List Atom)     ; AF membership frozen at snapshot time
+    (List Metric)   ; all metrics measured at this boundary
+    CIPSnapshot))
+
+(: initialize-baseline-cip (-> CIPSnapshot))
+(= (initialize-baseline-cip)
+    (let* (($_ (record-cip-series))
+           ($af (get-af-members))
+           ($metrics (measure-all-metrics)))
+        (CIPSnapshot 0 (current-time) $af $metrics)))
+
+(: transition-to-next-cip (-> CIPSnapshot CIPSnapshot))
+(= (transition-to-next-cip $prev-cip)
+    (let* (($_ (record-cip-series))
+           ($new-index (+ (get-cip-index $prev-cip) 1))
+           ($af (get-af-members))
+           ($metrics (measure-all-metrics)))
+        (CIPSnapshot $new-index (current-time) $af $metrics)))
+\end{lstlisting}
+
+\subsection{Attention Trend Analysis}
+
+\begin{lstlisting}[style=metta, caption=STI Trend and Volatility]
+;; STI trend for a single atom: direction of attention change at run end.
+;; Compares the most recent STI value to the series mean.
+(: sti-trend (-> Atom Symbol))
+(= (sti-trend $atom)
+    (let* (($series (get-sti-series $atom))
+           ($latest (last $series))
+           ($avg    (average $series)))
+        (if (> $latest $avg) rising
+            (if (< $latest $avg) falling
+                stable))))
+
+;; STI volatility: standard deviation of the atom's STI series.
+;; Near 0 = stable attention across CIPs; higher = fluctuating.
+(: sti-volatility (-> Atom Number))
+(= (sti-volatility $atom)
+    (standard-deviation (get-sti-series $atom)))
+\end{lstlisting}
+
+At end of each run, per-atom trend data is written to \texttt{trends.csv}
+(columns: \texttt{atom}, \texttt{trend}, \texttt{volatility}) for direct visualization,
+and included in \texttt{summary.json} under \texttt{atom\_trends}.
+Three aggregate metrics derived from the per-atom data are added to
+\texttt{summary.json} under \texttt{af\_trend\_summary}:
+
+\begin{lstlisting}[style=metta, caption=Derived Attention Trend Metrics]
+;; Fraction of AF atoms with stable STI trend at run end.
+;; Near 1 = attention fully settled; near 0 = all atoms in flux.
+(: af-stability-ratio (-> Number))
+(= (af-stability-ratio)
+    (/ (count-if (== trend stable) (af-trend-entries))
+       (length (af-trend-entries))))
+
+;; Mean STI volatility across AF atoms.
+;; Near 0 = low cross-CIP STI variance; higher = high turbulence.
+(: mean-af-volatility (-> Number))
+(= (mean-af-volatility)
+    (average (map volatility (af-trend-entries))))
+
+;; Net attention flow at run end: rising minus falling atoms.
+;; Positive = more atoms gaining salience; negative = more losing it.
+(: attention-trajectory (-> Number))
+(= (attention-trajectory)
+    (- (count-if (== trend rising)  (af-trend-entries))
+       (count-if (== trend falling) (af-trend-entries))))
+\end{lstlisting}
+
+\begin{thebibliography}{99}
+
+\bibitem{ECAN}
+Iklé, M., Pitt, J., Goertzel, B., \& Sellman, G. (2010).
+\textit{Economic Attention Networks: Associative Memory and Resource Allocation for General Intelligence}.
+Proceedings of the Third Conference on Artificial General Intelligence.
+
+\bibitem{tononi2008}
+Tononi, G. (2008).
+\textit{Consciousness as Integrated Information: A Provisional Manifesto}.
+The Biological Bulletin, 215(3), 216-242.
+
+\bibitem{coward2001}
+Coward, L. A. (2001).
+\textit{The Recommendation Architecture: Lessons from Large-Scale Electronic Systems Applied to Cognition}.
+Cognitive Systems Research, 2(2), 111-156.
+
+\bibitem{sellmanusing}
+Sellman, G. \& Goertzel, B. (2011).
+\textit{Using Economic Attention Networks for Controlling Embodied Intelligent Systems}.
+
+\bibitem{sophiacog}
+Goertzel, B. et al. (2017).
+\textit{The SophiaCog Project: Applying Open Source AGI to a Humanoid Robot}.
+
+\bibitem{CSbutlin2023consciousnessartificialintelligenceinsights}
+Butlin, P. et al. (2023).
+\textit{Consciousness in Artificial Intelligence: Insights from the Science of Consciousness}.
+
+\bibitem{CScontrollingceisnda}
+Controlling Conscious Experience in Systems with Diverse Architectures.
+
+\bibitem{CStononiphisnet}
+Tononi's Phi and Integrated Information in Network Systems.
+
+\bibitem{CSusingnldaapli}
+Using Nonlinear Dynamics Approaches in Cognitive Systems.
+
+\end{thebibliography}
+
+\end{document}
