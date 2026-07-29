@@ -1,6 +1,6 @@
-# CAIRN 
+# CAIRN
 
-CAIRN is an evaluation framework for attention mechanisms.
+CAIRN instruments ECAN attention state (AF, STI/LTI, Hebbian structure) at CIP boundaries and reports closed-form resource, effectiveness, and trajectory metrics.
 
 ## Prerequisites
 
@@ -61,13 +61,14 @@ Manual launch: `streamlit run dashboard/app.py`.
 
 ## Project Structure
 
-- **`demo.metta`** – Sanity check: main resource/effectiveness/topology metrics only
-- **`mve.metta`** – Full CAIRN/SYNAPSE-style pipeline (resource, effectiveness local+global, assessment, audit, probe)
-- **`assignment.metta`** – Same pipeline as mve on `data/sentences/` (insects-100 + poisons-50); Phase VIII gained-efficiency vs mve baseline
+- **`demo.metta`** – Resource, effectiveness, and topology metrics on the insect/poison run
+- **`mve.metta`** – Full metric set: resource, local/global effectiveness, assessment, audit, probe, topology
+- **`assignment.metta`** – Same pipeline as mve on `data/sentences/` (insects-100 + poisons-50); gained-efficiency vs mve baseline
 - **`evaluation/`** – Metric modules: resource, effectiveness, assessment, audit, probe, benchmark
-- **`tools/`** – Utilities: statistics (scipy), graph algorithms (networkx), CIP snapshots, time-series recording
-- **`data/`** – Sentence corpora (`.sent`), ECAN parameter presets, reference files
+- **`tools/`** – CIP snapshots, STI/LTI series, graph/topology helpers (networkx/scipy via Janus)
+- **`data/`** – Sentence corpora (`.sent`), ECAN parameter presets
 - **`dev-tests/`** – Unit tests for CAIRN internals
+- **`references/main.tex`** – Formula and pseudocode specs
 
 ## Architecture
 

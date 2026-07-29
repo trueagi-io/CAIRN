@@ -1,6 +1,6 @@
 # Fdb version 4
-["pdflatex"] 1784640641.84427 "/Users/lena/Documents/SNET/MeTTa-dev-env/CAIRN/references/main.tex" "main.pdf" "main" 1784640642.60284 0
-  "/Users/lena/Documents/SNET/MeTTa-dev-env/CAIRN/references/main.tex" 1784640640.79139 18468 92d8941539f5d3b145a9c7249e4e5ed3 ""
+["pdflatex"] 1785339061.06563 "/Users/lena/Documents/SNET/MeTTa-dev-env/CAIRN/references/main.tex" "main.pdf" "main" 1785339061.85629 0
+  "/Users/lena/Documents/SNET/MeTTa-dev-env/CAIRN/references/main.tex" 1785339060.85473 17478 de132fe3557eaa4bfd4718e3955ab381 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/cm-super/cm-super-ts1.enc" 1136849721 2900 1537cc8184ad1792082cd229ecc269f4 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/tfm/jknappen/ec/tcrm1095.tfm" 1136768653 1536 02c06700a42be0f5a28664c7273f82e7 ""
@@ -177,10 +177,10 @@
   "/usr/local/texlive/2025/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1758498289 5467155 19efa205003f9ecad95fbbaa6ff24da1 ""
   "/usr/local/texlive/2025/texmf-var/web2c/pdftex/pdflatex.fmt" 1741450574 3345740 46b66fdb0378f7bf5921b5eabf1762b8 ""
   "/usr/local/texlive/2025/texmf.cnf" 1741450484 577 418a7058ec8e006d8704f60ecd22c938 ""
-  "main.aux" 1784640642.53923 5209 0f0db37a4874df39e425a4fb6c5c84a8 "pdflatex"
-  "main.out" 1784640642.53987 2629 08d7d03e92816f8d08bfad9d5737920f "pdflatex"
-  "main.tex" 1784640640.79139 18468 92d8941539f5d3b145a9c7249e4e5ed3 ""
-  "main.toc" 1784640642.54008 1463 71f553e4169215e36a5ce57282dd97cc "pdflatex"
+  "main.aux" 1785339061.78909 4932 2ef6f29a8dc0a885311bf6a3e9707699 "pdflatex"
+  "main.out" 1785339061.78972 2316 3e76320d9a674d17ef8017f77d050f60 "pdflatex"
+  "main.tex" 1785339060.85473 17478 de132fe3557eaa4bfd4718e3955ab381 ""
+  "main.toc" 1785339061.78988 1407 6b7b0ee1bfd779d0ff84e5419844854f "pdflatex"
   (generated)
   "main.aux"
   "main.log"

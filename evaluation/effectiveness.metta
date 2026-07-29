@@ -1,8 +1,8 @@
 ; =============================================================
-; CAIRN – Effectiveness Calculation  (spec §2.2)
+; CAIRN – Effectiveness  (spec §2.2)
 ;
-; Quantifies attention effectiveness as performance gain per
-; resource unit across two CIP snapshots.
+; eff = aggregate-metric-delta / total-resource-cost
+; between two CIP snapshots (0 if cost is 0).
 ;
 ; Depends on: tools/cip (CIPSnapshot, Metric, get-metric)
 ;             resource.metta (measure-af-size-ratio,
@@ -41,8 +41,7 @@
 
 ; ---- §2.2.2  Metric delta ------------------------------------
 
-; Average improvement across STI-concentration and link-density.
-; Positive means attention state improved between snapshots.
+; Mean of Δ(sti-concentration) and Δ(link-density).
 (= (aggregate-metric-delta $s1 $s2)
    (let* (($c1     (get-metric $s1 sti-concentration))
           ($c2     (get-metric $s2 sti-concentration))
@@ -54,9 +53,7 @@
 
 ; ---- §2.2.3  Resource cost -----------------------------------
 
-; Combined resource footprint: AF occupancy + STI concentration + link
-; overhead (spec §2.1's three resource-cost factors). All three are
-; normalised to [0, 1] by resource.metta.
+; cost = af-size-ratio + sti-concentration + link-density ([0,1] each).
 (= (total-resource-cost)
    (let* (($r (measure-af-size-ratio))
           ($c (measure-sti-concentration))
@@ -64,8 +61,7 @@
         (+ $r (+ $c $d))))
 
 ; ---- §2.2.4  Effectiveness -----------------------------------
-; Δperf = mean(sti-concentration, link-density) change (CAIRN bag).
-; Primary reported effectiveness is global (baseline → current).
+; Primary reported value is global (baseline → current).
 
 (= (calculate-effectiveness $from $to)
    (let* (($perf-delta    (aggregate-metric-delta $from $to))
@@ -90,9 +86,8 @@
    (let* (($_ (stimulate $atom $stimulus)))
         (add-redundant-atoms $rest $stimulus)))
 
-; Measure how much inserting redundant atoms degrades attention
-; efficiency.  $redundant-copies: cons-list of atom names.
-; Returns (PerformanceReport redundancy-impact $degradation-rate).
+; Inject redundant atoms; report (Δ_base − Δ_degraded) / cost overhead.
+; $redundant-copies: cons-list of atom names.
 (= (test-redundancy-degradation $cip-prev $cip-curr $redundant-copies)
    (let* (($baseline-perf  (aggregate-metric-delta $cip-prev $cip-curr))
           ($baseline-cost  (total-resource-cost))

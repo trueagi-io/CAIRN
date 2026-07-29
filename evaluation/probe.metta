@@ -1,8 +1,8 @@
 ; =============================================================
-; CAIRN – Test Probing  (spec §3.3, Phase III)
+; CAIRN – Probe Metrics  (spec §3.3)
 ;
-; Trajectory and coordination tests over the running CIP series
-; and the Hebbian-link module structure.
+; Cognitive maintenance (mean AF Jaccard over CIP series) and
+; glocal coordination (√(local_coh × global_coh) on H-modules).
 ;
 ; Depends on: tools/utils (average, pearson-correlation,
 ;             get-all-hlinks, get-hlink-source/target/probability,
@@ -65,7 +65,7 @@
                   ($w   (get-hlink-probability $src $tgt)))
               ($src $tgt $w)))))
 
-; Weighted Louvain (networkx); all Hebbian links, same scope as SYNAPSE.
+; Weighted Louvain (networkx) over all Hebbian links.
 (= (identify-modules $links)
    (py-call (utils.identify_modules (links-to-edges $links))))
 

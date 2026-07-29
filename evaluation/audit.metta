@@ -1,9 +1,8 @@
 ; =============================================================
-; CAIRN – Audit Metrics  (spec §3.3, Phase II)
+; CAIRN – Audit Metrics  (spec §3.3)
 ;
-; Audits the global allocation of STI across the entire typeSpace
-; (not just the Attentional Focus), independent of resource/
-; effectiveness/assessment metrics.
+; Pre-allocation space: H(p̂) / log₂ n on min-shifted STI
+; over typeSpace.
 ;
 ; Depends on: tools/utils (sum, minimum, shannon-entropy, map-flat)
 ;             -- caller must pre-import this (e.g. via evaluation/resource,
@@ -13,9 +12,7 @@
 ; =============================================================
 
 ; ---- §3.3.1  Preallocation Space ----------------------------
-; Normalized Shannon entropy of the STI distribution across all
-; atoms in the typeSpace. Near 0 = STI tightly concentrated on a
-; few atoms; near 1 = STI spread near-uniformly across all atoms.
+; H(min-shifted normalized STI) / log2(|atoms|).
 
 (= (measure-preallocation-space)
    (let* (($atoms (getAtomsInTypeSpace))

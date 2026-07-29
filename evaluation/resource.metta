@@ -1,8 +1,8 @@
 ; =============================================================
-; CAIRN – Resource Cost Functions  (spec §2.1)
+; CAIRN – Resource Metrics  (spec §2.1)
 ;
-; Three metrics that quantify ECAN's current resource usage.
-; All values are normalised to [0, 1].
+; AF size ratio, STI concentration, AF-internal link density.
+; Each normalised to [0, 1].
 ;
 ; Depends on: metta-attention API (getAfAtoms, getAllAtomsWithBins,
 ;             getAtomsInTypeSpace, getSti, isAtomInAf, size-atom)
@@ -16,8 +16,7 @@
 ; dedup), causing silent non-determinism. See dev-tests/test_regression.metta.
 
 ; ---- §2.1.1  AF Size Ratio -----------------------------------
-; Fraction of known atoms currently in the Attentional Focus.
-; A value near 0 means ECAN is highly selective.
+; |AF| / |Atoms|.
 
 (= (measure-af-size-ratio)
    (let* (($af    (getAfAtoms))
@@ -26,9 +25,7 @@
         (if (> $all-n 0.0) (/ $af-n $all-n) 0.0)))
 
 ; ---- §2.1.2  STI Concentration ------------------------------
-; Fraction of total STI held by AF members.
-; High values indicate tight attention; low values mean STI is
-; spread thinly across the whole typeSpace.
+; sum STI(AF) / sum STI(all).
 
 (= (measure-sti-concentration)
    (let* (($af        (getAfAtoms))
@@ -38,8 +35,8 @@
         (if (> $all-sti 0.0) (/ $af-sti $all-sti) 0.0)))
 
 ; ---- §2.1.3  Link Density -----------------------------------
-; |AF-internal Hebbian| / k(k-1). AF-out enum + target in AF
-; (not SYNAPSE unfiltered out-count; not full typeSpace scan).
+; |H-links with both ends in AF| / (|AF|(|AF|-1)); 0 if |AF| < 2.
+; Counted via AF-out links whose target is also in AF.
 
 (= (measure-link-density)
    (let* (($af   (getAfAtoms))

@@ -1,8 +1,8 @@
 ; =============================================================
-; CAIRN – Benchmark Metric  (spec §2.2, Phase VIII)
+; CAIRN – Benchmark Metric  (spec §2.2)
 ;
-; Compares the effectiveness of two ECAN runs (baseline vs
-; optimized) over paired consecutive CIP snapshots.
+; Gained efficiency: (eff_opt − eff_base) / |eff_base|
+; over paired CIP snapshots from two runs.
 ;
 ; Depends on: evaluation/effectiveness (calculate-effectiveness)
 ;             -- caller must pre-import this; this file must NOT
@@ -11,9 +11,7 @@
 ; =============================================================
 
 ; ---- §2.2  Gained Efficiency --------------------------------
-; Normalized effectiveness improvement of the optimized run
-; relative to the baseline.  Returns 0.0 when the baseline
-; effectiveness is zero (avoids division by zero).
+; 0.0 when baseline effectiveness is zero.
 
 (= (measure-gained-efficiency $base-prev $base-curr $opt-prev $opt-curr)
    (let* (($baseline-eff  (calculate-effectiveness $base-prev $base-curr))

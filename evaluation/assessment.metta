@@ -1,8 +1,8 @@
 ; =============================================================
-; CAIRN – Assessment Metrics  (spec §3.2, Phase I)
+; CAIRN – Assessment Metrics  (spec §3.2)
 ;
-; Five metrics quantifying attention quality beyond basic
-; resource/effectiveness measures.
+; Coherence, context retention, distributed importance,
+; selective modulation, connection ratio.
 ;
 ; Depends on: tools/utils (variance, minimum, maximum,
 ;             pearson-correlation, get-all-hlinks,
@@ -45,7 +45,7 @@
           0.0)))
 
 ; ---- §3.2.3  Distributed Importance ------------------------------
-; Pearson(mean STI series, LTI) over typeSpace. SYNAPSE parity; Θ(N·T).
+; Pearson(mean STI series, LTI) over typeSpace. Θ(N·T).
 
 (= (measure-distributed-importance)
    (let $atoms (getAtomsInTypeSpace)
@@ -74,7 +74,7 @@
           (cons-atom $lti (collect-ltis $rest)))))
 
 ; ---- §3.2.4  Selective Modulation ---------------------------
-; Var(STI) / ((max-min)^2/12) — SYNAPSE range-uniform null. Θ(N).
+; Var(STI) / ((max-min)^2/12) — range-uniform null. Θ(N).
 
 (= (measure-selective-modulation)
    (let $atoms (getAtomsInTypeSpace)

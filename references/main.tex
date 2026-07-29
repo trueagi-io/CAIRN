@@ -52,7 +52,7 @@
 \maketitle
 
 \begin{abstract}
-We detail here the specs for a first realization of CAIRN, based on the materials developed during the SYNAPSE (SYstematic Neural-symbolic Attention Processing System Evaluation) research project. Following the assumption that attention allocation effectiveness can be quantified as the tradeoff between resource consumption and performance gain, this document provides a high level specification using MeTTa-like pseudocode, for now independent of any specific language version dependency.
+CAIRN specifies task-agnostic metrics on an ECAN substrate: AF, STI/LTI, and Hebbian structure, sampled at CIP boundaries. Effectiveness is the ratio of aggregate metric delta to composite resource cost. This document gives the closed forms and MeTTa-style pseudocode independent of a particular language binding.
 \end{abstract}
 
 \tableofcontents
@@ -60,9 +60,9 @@ We detail here the specs for a first realization of CAIRN, based on the material
 
 \section{Background}\label{sec:background}
 
-\subsection{SYNAPSE}
+\subsection{Scope}
 
-The SYNAPSE framework addresses the critical challenge of evaluating attention mechanisms in AI systems by treating attention allocation as a resource management problem. This proof of concept establishes the theoretical and computational foundations for measuring attention effectiveness through the main ratio or tradeoff between performance gain and resource cost.
+Metrics are defined only on attention state. No external task score enters the formulas. Evaluation compares CIP snapshots and trajectories under a fixed agent/parameter regime.
 
 \subsection{ECANs}
 
@@ -78,17 +78,17 @@ An ECAN can be represented as a graph consisting of the following atomic entitie
     \item A forgetful operation to prune low-value atoms
 \end{itemize}
 
-The metaphor at hand is that STI and LTI form a pair of cryptocurrencies in a liquidity pool. The STI is subject to conservation (modulo inflation) of total value, making the dynamics drastically different from classical artificial neural networks and more compatible with bioinspired models. The LTI indicates the value the ECAN perceives in retaining the atom in memory (RAM).
+STI is competitive attention mass (conserved modulo inflation and rent). LTI is retention value for keeping an atom in memory.
 
-\section{Minimal Proof of Concept}\label{sec:minimal}
+\section{Core Metrics}\label{sec:minimal}
 
 \subsection{Resource Cost Functions}
 
-Resource costs are based on AF size and STI budget usage:
+Composite resource cost uses three normalized factors in $[0,1]$:
 \begin{itemize}
-    \item Size of AttentionalFocus
-    \item STI distribution
-    \item Number of active Hebbian links
+    \item AF size ratio
+    \item STI concentration
+    \item AF-internal Hebbian link density
 \end{itemize}
 
 \begin{lstlisting}[style=metta, caption=Ratio]
@@ -100,6 +100,7 @@ Resource costs are based on AF size and STI budget usage:
         $ratio))
 \end{lstlisting}
 
+\clearpage
 \begin{lstlisting}[style=metta, caption=Concentration]
 (: measure-sti-concentration (-> Number))
 (= (measure-sti-concentration)
@@ -124,6 +125,8 @@ Resource costs are based on AF size and STI budget usage:
 \end{lstlisting}
 
 \subsection{Effectiveness Calculation}
+
+Metric delta is the mean change in STI concentration and AF link density between two CIP snapshots. Resource cost is the sum of AF size ratio, STI concentration, and AF link density at the later snapshot. Effectiveness is their ratio (0 if cost is 0).
 
 Primary reported effectiveness is \textbf{global} (baseline CIP $\to$ current).
 Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
@@ -158,9 +161,9 @@ Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
         (PerformanceReport redundancy-impact $degradation-rate)))
 \end{lstlisting}
 
-\section{ECAN Evaluation Pipeline}\label{sec:evaluation}
+\section{Derived Metrics}\label{sec:evaluation}
 
-\subsection{Minimal Viable Evaluation}
+\subsection{Coherence and Retention}
 
 \begin{lstlisting}[style=metta, caption=Coherence]
 (: measure-attention-coherence (-> Number))
@@ -181,7 +184,7 @@ Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
         (/ $overlap $union-size)))
 \end{lstlisting}
 
-\subsection{Phase I: Assessment}
+\subsection{Assessment}
 
 \begin{lstlisting}[style=metta, caption=Assessment]
 ;; Distributed importance: Pearson(mean STI series, current LTI)
@@ -223,7 +226,7 @@ Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
             0)))
 \end{lstlisting}
 
-\subsection{Phase II: Audits}
+\subsection{Audit}
 
 \begin{lstlisting}[style=metta, caption=Audit]
 (: measure-preallocation-space (-> Number))
@@ -239,9 +242,9 @@ Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
 \end{lstlisting}
 
 \clearpage
-\subsection{Phase III: Test Probing}
+\subsection{Trajectory and Coordination}
 
-\begin{lstlisting}[style=metta, caption=Trajectory Test]
+\begin{lstlisting}[style=metta, caption=Trajectory]
 (: measure-cognitive-maintenance (-> (List CIPSnapshot) Number))
 (= (measure-cognitive-maintenance $cip-series)
     (let* (($pairs (consecutive-pairs $cip-series))
@@ -252,7 +255,7 @@ Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
         (average $overlaps)))
 \end{lstlisting}
 
-\begin{lstlisting}[style=metta, caption=Coordination Test]
+\begin{lstlisting}[style=metta, caption=Coordination]
 ;; Glocal: geometric mean of local and cross-module coherence
 ;; Modules: weighted Louvain over all Hebbian links (weights = STV means)
 (: measure-glocal-coordination (-> Number))
@@ -274,9 +277,9 @@ Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
         (sqrt (* $local-coherence $global-coherence))))
 \end{lstlisting}
 
-\subsection{Phase VIII: Benchmarking}
+\subsection{Benchmark}
 
-\begin{lstlisting}[style=metta, caption=Effectiveness Benchmark]
+\begin{lstlisting}[style=metta, caption=Gained Efficiency]
 (: measure-gained-efficiency (-> CIPSnapshot CIPSnapshot
                                  CIPSnapshot CIPSnapshot Number))
 (= (measure-gained-efficiency $base-prev $base-curr $opt-prev $opt-curr)
@@ -286,7 +289,7 @@ Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
 \end{lstlisting}
 
 \clearpage
-\section{Developer Tools}
+\section{Instrumentation}
 
 \subsection{Time Series}
 
@@ -340,7 +343,7 @@ Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
 
 \subsection{Utilities}
 
-\begin{lstlisting}[style=metta, caption=Developers SDK]
+\begin{lstlisting}[style=metta, caption=Coherence helpers]
 ;; Time-averaged STI co-activation of two atoms over a CIP trajectory
 (: temporal-conjunction (-> Atom Atom Number))
 (= (temporal-conjunction $atom-i $atom-j)
@@ -348,7 +351,7 @@ Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
            ($sti-j (get-sti-series $atom-j)))
         (average (map * $sti-i $sti-j))))
 
-;; Coherence: (Pearson Correlation)
+;; Coherence: Pearson of link probabilities vs temporal conjunctions
 (: measure-coherence (-> (List Atom) Number))
 (= (measure-coherence $atoms)
     (let* (($hlinks (get-hebbian-links-within $atoms))
@@ -410,7 +413,7 @@ Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
     (standard-deviation (get-sti-series $atom)))
 \end{lstlisting}
 
-At end of each run, per-atom trend data is written to \texttt{trends.csv}
+At end of each run trends are written to \texttt{trends.csv}
 (columns: \texttt{atom}, \texttt{trend}, \texttt{volatility}) for direct visualization,
 and included in \texttt{summary.json} under \texttt{atom\_trends}.
 Three aggregate metrics derived from the per-atom data are added to
@@ -445,11 +448,6 @@ Iklé, M., Pitt, J., Goertzel, B., \& Sellman, G. (2010).
 \textit{Economic Attention Networks: Associative Memory and Resource Allocation for General Intelligence}.
 Proceedings of the Third Conference on Artificial General Intelligence.
 
-\bibitem{tononi2008}
-Tononi, G. (2008).
-\textit{Consciousness as Integrated Information: A Provisional Manifesto}.
-The Biological Bulletin, 215(3), 216-242.
-
 \bibitem{coward2001}
 Coward, L. A. (2001).
 \textit{The Recommendation Architecture: Lessons from Large-Scale Electronic Systems Applied to Cognition}.
@@ -459,22 +457,9 @@ Cognitive Systems Research, 2(2), 111-156.
 Sellman, G. \& Goertzel, B. (2011).
 \textit{Using Economic Attention Networks for Controlling Embodied Intelligent Systems}.
 
-\bibitem{sophiacog}
-Goertzel, B. et al. (2017).
-\textit{The SophiaCog Project: Applying Open Source AGI to a Humanoid Robot}.
-
-\bibitem{CSbutlin2023consciousnessartificialintelligenceinsights}
-Butlin, P. et al. (2023).
-\textit{Consciousness in Artificial Intelligence: Insights from the Science of Consciousness}.
-
-\bibitem{CScontrollingceisnda}
-Controlling Conscious Experience in Systems with Diverse Architectures.
-
-\bibitem{CStononiphisnet}
-Tononi's Phi and Integrated Information in Network Systems.
-
-\bibitem{CSusingnldaapli}
-Using Nonlinear Dynamics Approaches in Cognitive Systems.
+\bibitem{nldapli}
+Goertzel, B. et al.
+\textit{Using Nonlinear Dynamical Attention Allocation to Focus Probabilistic Logical Inference Upon Relevant Information}.
 
 \end{thebibliography}
 

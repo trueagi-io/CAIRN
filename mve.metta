@@ -1,11 +1,10 @@
 ; =============================================================
-; CAIRN – MVE (Minimal Viable Evaluation)
+; CAIRN – MVE
 ;
-; Same insect/poison experiment as demo.metta, but records the
-; full metric set including the five §3.2 assessment metrics
-; (attention-coherence, context-retention, distributed-importance,
-; selective-modulation, connection-ratio) on top of the basic
-; resource/effectiveness/topology metrics demo.metta records.
+; Insect/poison run with full metric set: resource, local/global
+; effectiveness, assessment (coherence, retention, distributed
+; importance, selective modulation, connection ratio), audit,
+; probe, topology.
 ;
 ; Run from the CAIRN directory:
 ;   source venv/bin/activate

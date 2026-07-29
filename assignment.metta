@@ -1,5 +1,5 @@
 ; =============================================================
-; CAIRN - Assignment: MVE Benchmark (Phase VIII)
+; CAIRN - Assignment: MVE Benchmark
 ;
 ; mve.metta's exact pipeline and ECAN parameters, run against the
 ; real insect/poison corpus from data/sentences/ instead of
