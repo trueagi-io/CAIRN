@@ -1,0 +1,35 @@
+; Shared prefix: core + full ECAN dynamics, then seed → cycles → capture F.
+; PLN STV priors not yet loaded.
+!(import! &self core)
+!(import! &self ecan)
+!(import! &self "cognitive_synergy_io.py")
+
+; Diffusion / rent / forget knobs (scenario sets MAX_AF_SIZE)
+!(updateAttentionParam MAX_SPREAD_PERCENTAGE 0.4)
+!(updateAttentionParam HEBBIAN_MAX_ALLOCATION_PERCENTAGE 0.1)
+!(updateAttentionParam AFRentFrequency 1000.0)
+!(updateAttentionParam TOPK 1.0)
+; Forgetting: prune low-LTI atoms when TypeSpace exceeds MAX_SIZE.
+; Default MAX_SIZE=2 would wipe small scenarios — keep headroom above |V|+hebbian.
+!(updateAttentionParam MAX_SIZE 64.0)
+!(updateAttentionParam ACC_DIV_SIZE 4.0)
+!(updateAttentionParam FORGET_THRESHOLD 0.05)
+
+; Incident graph auto-built from table legs (no hand-maintained fx-install-incident!)
+!(install-incident-from-tables! (fx-tables))
+!(register-all! (fx-objects))
+!(seed-all! (fx-seeds) 300.0)
+!(bind! &Fseed (new-state ()))
+!(change-state! &Fseed (positive-focus (getAfAtoms)))
+!(ecan-cycles! (fx-cycles))
+!(bind! &Fold (new-state ()))
+!(change-state! &Fold (positive-focus (getAfAtoms)))
+!(bind! &F (new-state ()))
+!(change-state! &F (get-state &Fold))
+!(bind! &k (new-state 0))
+!(change-state! &k (size-atom (get-state &F)))
+!(bind! &B (new-state 10))
+!(bind! &wage (new-state 200.0))
+; Random-arm RNG seed (driver may override via &rngSeed before import)
+!(bind! &rngSeed (new-state 0))
+!(println! (ecan seed-F (get-state &Fseed) after-F (get-state &F) cycles (fx-cycles)))

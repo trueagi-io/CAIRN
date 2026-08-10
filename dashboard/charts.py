@@ -10,7 +10,7 @@ _CATEGORICAL = [
 
 _COLUMN_ORDER = [
     'af_size_ratio', 'sti_concentration', 'link_density',
-    'effectiveness', 'local_effectiveness', 'metric_delta', 'resource_cost',
+    'effectiveness', 'partial_effectiveness', 'metric_delta', 'resource_cost',
 
     'attention_coherence', 'context_retention',
     'connection_ratio', 'distributed_importance',
@@ -45,11 +45,13 @@ INK_MUTED = '#8b8fa3'
 LABELS = {
     'cip_index': 'CIP', 'af_size': 'AF Size', 'af_size_ratio': 'AF Ratio',
     'sti_concentration': 'STI Concentration', 'link_density': 'Link Density',
-    'effectiveness': 'Effectiveness (global)', 'local_effectiveness': 'Effectiveness (local)',
+    'effectiveness': 'Effectiveness (total)', 'partial_effectiveness': 'Effectiveness (partial)',
     'metric_delta': 'Metric Delta', 'resource_cost': 'Resources Cost',
 
     'attention_coherence': 'Coherence', 'context_retention': 'Context Retention',
-    'distributed_importance': 'Distributed Importance', 'selective_modulation': 'Selective Modulation',
+    'distributed_importance': 'Distributed Importance',
+    'cognitive_synergy': 'Distributed Importance',  # upstream getCognitiveSynergy → CAIRN name
+    'selective_modulation': 'Selective Modulation',
     'connection_ratio': 'Connection Ratio', 'preallocation_space': 'Preallocated Space',
     'triangles': 'Triangles', 'betti_0': 'Betti₀', 'betti_1': 'Betti₁', 'betti_2': 'Betti₂',
     'timestamp': 'Timestamp', 'hebbian_links': 'Hebbian Links',
@@ -61,6 +63,50 @@ LABELS = {
     'volatility': 'Volatility', 'trend': 'Trend', 'atom': 'Atom',
     'MAX_AF_SIZE': 'Max AF Size', 'TARGET_STI': 'Target STI', 'TARGET_LTI': 'Target LTI',
     'FUNDS_STI': 'Funds STI', 'FUNDS_LTI': 'Funds LTI', 'TOPK': 'Top K', 'batch_size': 'Batch Size',
+    # cognitive synergy protocols (ECAN–PLN bridge)
+    # canonical arms: weighted | influenced | distracted
+    'weighted_solve': 'Weighted solve rate',
+    'influenced_solve': 'Influenced solve rate',
+    'distracted_solve': 'Distracted solve rate',
+    'influenced_beats_distracted': 'Influenced beats distracted',
+    'influenced_beats_distracted_rate': 'Influenced beats distracted',
+    'influenced_faster_than_distracted': 'Influenced faster than distracted',
+    'influenced_faster_than_distracted_rate': 'Influenced faster than distracted',
+    'influenced_premises': 'Influenced premises',
+    'distracted_premises': 'Distracted premises',
+    'weighted_premises': 'Weighted premises',
+    'influenced_confidence': 'Influenced confidence',
+    'distracted_confidence': 'Distracted confidence',
+    'query_af_overlap': 'Query–AF overlap', 'ecan_cycles': 'ECAN cycles',
+    'seed': 'RNG seed', 'n_seeds': 'Seeds (legacy)',
+    'fixture': 'Fixture', 'scenario': 'Scenario', 'protocol': 'Protocol', 'budget': 'Budget',
+    'sti_gain_sum': 'STI gain (sum)', 'proof_retained_in_af': 'Proof retained in AF',
+    'weighted_wall_ms': 'Weighted PLN wall (ms)',
+    'influenced_wall_ms': 'Influenced PLN wall (ms)',
+    'distracted_wall_ms': 'Distracted PLN wall (ms)',
+    'weighted_solved': 'Weighted solved',
+    'influenced_solved': 'Influenced solved',
+    'distracted_solved': 'Distracted solved',
+    'n_waged': 'Atoms waged',
+    'wage_applied': 'Wage applied',
+    'wage_method': 'Wage method',
+    'focus_cap': 'Focus cap k',
+    'focus_size': 'Focus size',
+    'pln_wall_ms': 'PLN wall (ms)',
+    'mean_weighted_wall_ms': 'Mean weighted PLN (ms)',
+    'mean_influenced_wall_ms': 'Mean influenced PLN (ms)',
+    'mean_distracted_wall_ms': 'Mean distracted PLN (ms)',
+    # legacy keys (old runs)
+    'full_solve': 'Weighted solve rate', 'af_solve': 'Influenced solve rate',
+    'random_solve': 'Distracted solve rate',
+    'af_beats_random': 'Influenced beats distracted',
+    'af_premises': 'Influenced premises', 'random_premises': 'Distracted premises',
+    'af_confidence': 'Influenced confidence', 'random_confidence': 'Distracted confidence',
+    'full_wall_ms': 'Weighted PLN wall (ms)', 'af_wall_ms': 'Influenced PLN wall (ms)',
+    'random_wall_ms': 'Distracted PLN wall (ms)',
+    'af_faster_than_random': 'Influenced faster than distracted',
+    'mean_full_wall_ms': 'Mean weighted PLN (ms)', 'mean_af_wall_ms': 'Mean influenced PLN (ms)',
+    'mean_random_wall_ms': 'Mean distracted PLN (ms)',
 }
 
 
@@ -177,7 +223,7 @@ def resource_ratios_chart(df, x_col='cip_index'):
 
 
 def effectiveness_chart(df, x_col='cip_index'):
-    return _line_panel(df, ['effectiveness', 'local_effectiveness',
+    return _line_panel(df, ['effectiveness', 'partial_effectiveness',
                              'metric_delta', 'resource_cost'],
                         'Effectiveness', x_col=x_col)
 

@@ -38,8 +38,11 @@ def _live_fragment(run, interval, x_col):
 
         chart_grid.render(df, x, key_prefix=f'live_{run.label}')
 
+        # Promote live → completed when summary catches up. Clear discover
+        # cache so state/labels refresh; keep selected_run_dir session key.
         if data.summary_is_current(run.metrics_path, run.summary_path):
-            st.rerun()  # promotes this run from live -> completed on the next top-level render
+            st.cache_data.clear()
+            st.rerun()
 
     _inner()
 

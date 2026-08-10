@@ -15,14 +15,14 @@
 ; ---- Lifecycle -----------------------------------------------
 
 (= (cairn-init-recorder)
-   (py-call (recorder.init_recorder "output")))
+   (py-call (recorder.init_recorder "output/demo")))
 
 (= (cairn-close-recorder)
    (py-call (recorder.close_recorder)))
 
 ; ---- Per-CIP recording --------------------------------------
 
-; Thin demo path: effectiveness = global; local_effectiveness = step.
+; Thin demo path: effectiveness = total; partial_effectiveness = step.
 (= (cairn-record-cip $cip-index $baseline-snap $prev-snap $snap)
    (let* (($_ (println! (record-cip start $cip-index)))
           ($af      (getAfAtoms))
@@ -34,8 +34,8 @@
           ($_ (println! (record-cip sti-concentration done)))
           ($density (measure-link-density))
           ($_ (println! (record-cip link-density done)))
-          ($eff-g   (measure-global-effectiveness $baseline-snap $snap))
-          ($eff-l   (measure-local-effectiveness $prev-snap $snap))
+          ($eff-g   (measure-total-effectiveness $baseline-snap $snap))
+          ($eff-l   (measure-partial-effectiveness $prev-snap $snap))
           ($delta   (aggregate-metric-delta $prev-snap $snap))
           ($cost    (total-resource-cost))
           ($_ (println! (record-cip effectiveness done)))
@@ -88,7 +88,7 @@
           ($b1      (topology-betti-1 $topo))
           ($b2      (topology-betti-2 $topo))
           ($hcount  (size-atom (get-all-hlinks)))
-          ($eff     (measure-global-effectiveness $baseline-snap $final-snap))
+          ($eff     (measure-total-effectiveness $baseline-snap $final-snap))
           ($trends  (cairn-collect-af-trends)))
       (py-call (recorder.write_summary
                   $params

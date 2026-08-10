@@ -52,7 +52,7 @@
 \maketitle
 
 \begin{abstract}
-CAIRN specifies task-agnostic metrics on an ECAN substrate: AF, STI/LTI, and Hebbian structure, sampled at CIP boundaries. Effectiveness is the ratio of aggregate metric delta to composite resource cost. This document gives the closed forms and MeTTa-style pseudocode independent of a particular language binding.
+CAIRN evaluates task-agnostic metrics on an ECAN substrate: AF, STI/LTI, and Hebbian structure, sampled at CIP boundaries. Effectiveness is defined as the ratio of aggregate metric delta to composite resource cost. \textbf{Cognitive Synergy} bridges ECAN\&PLN protocol evaluation (steering and feedback) on a tabulated shared map~\cite{nldapli,ECAN,tauSLD,allegories}. This document gives closed forms and MeTTa-style pseudocode independent of a particular language binding.
 \end{abstract}
 
 \tableofcontents
@@ -62,7 +62,7 @@ CAIRN specifies task-agnostic metrics on an ECAN substrate: AF, STI/LTI, and Heb
 
 \subsection{Scope}
 
-Metrics are defined only on attention state. No external task score enters the formulas. Evaluation compares CIP snapshots and trajectories under a fixed agent/parameter regime.
+Structural metrics are defined only on attention state. No external task score enters those formulas. CIP evaluation compares snapshots and trajectories under a fixed agent/parameter regime.
 
 \subsection{ECANs}
 
@@ -128,8 +128,8 @@ Composite resource cost uses three normalized factors in $[0,1]$:
 
 Metric delta is the mean change in STI concentration and AF link density between two CIP snapshots. Resource cost is the sum of AF size ratio, STI concentration, and AF link density at the later snapshot. Effectiveness is their ratio (0 if cost is 0).
 
-Primary reported effectiveness is \textbf{global} (baseline CIP $\to$ current).
-Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
+Primary reported effectiveness is \textbf{total} (baseline CIP $\to$ current).
+Partial effectiveness (previous CIP $\to$ current) is recorded as a step series.
 
 \begin{lstlisting}[style=metta, caption=Attention Effectiveness]
 (: calculate-effectiveness (-> CIPSnapshot CIPSnapshot Number))
@@ -138,12 +138,12 @@ Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
            ($resource-cost (total-resource-cost)))
         (/ $perf-delta $resource-cost)))
 
-(: measure-local-effectiveness (-> CIPSnapshot CIPSnapshot Number))
-(= (measure-local-effectiveness $prev $curr)
+(: measure-partial-effectiveness (-> CIPSnapshot CIPSnapshot Number))
+(= (measure-partial-effectiveness $prev $curr)
     (calculate-effectiveness $prev $curr))
 
-(: measure-global-effectiveness (-> CIPSnapshot CIPSnapshot Number))
-(= (measure-global-effectiveness $baseline $curr)
+(: measure-total-effectiveness (-> CIPSnapshot CIPSnapshot Number))
+(= (measure-total-effectiveness $baseline $curr)
     (calculate-effectiveness $baseline $curr))
 \end{lstlisting}
 
@@ -241,7 +241,6 @@ Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
         (/ $entropy (log2 (count $atoms)))))
 \end{lstlisting}
 
-\clearpage
 \subsection{Trajectory and Coordination}
 
 \begin{lstlisting}[style=metta, caption=Trajectory]
@@ -250,8 +249,7 @@ Local effectiveness (previous CIP $\to$ current) is recorded as a step series.
     (let* (($pairs (consecutive-pairs $cip-series))
            ($overlaps (map (lambda ($pair)
                              (measure-context-retention
-                               (first $pair) (second $pair)))
-                          $pairs)))
+                               (first $pair) (second $pair))) $pairs)))
         (average $overlaps)))
 \end{lstlisting}
 
@@ -441,6 +439,67 @@ Three aggregate metrics derived from the per-atom data are added to
        (count-if (== trend falling) (af-trend-entries))))
 \end{lstlisting}
 
+\section{ECAN\&PLN Bridge}\label{sec:cognitive-synergy}
+
+This section describes the \textbf{cognitive synergy} experiment in \texttt{CAIRN/bridge/}.
+
+\subsection{Architecture}
+
+\paragraph{Attention processing.}
+Attention data is exported to JSON (AF atoms, STI pairs, AF-incident Hebbian edges) through CIP snapshots. A separate PeTTa process tabulates a map and runs PLN. Coupling is therefore freeze-out of attention state.
+
+\paragraph{Shared kernel.}
+One measurement step is:
+\begin{enumerate}
+    \item Attention snapshot $\rightarrow$ scenario generation (Hebbian edges mirrored as Inheritance premises for PeTTa PLN).
+    \item Pre-step builds the control focus set $F$ (\texttt{freeze-f} or \texttt{re-dynamics}).
+    \item Steering runs three arms under a fixed PLN step budget hyperparameter $B$, recording solve, confidence, premise counts, and wall-clock \texttt{wall\_ms}.
+\end{enumerate}
+Python coordination lives in \texttt{bridge/coupled.py}, \texttt{export\_snapshot.py}, \texttt{scenario\_from\_snapshot.py}, and \texttt{run\_bridge.py}. MeTTa protocols live under \texttt{bridge/} (\texttt{steering.metta}, \texttt{feedback.metta}, \texttt{pre.metta}, \texttt{pre\_freeze.metta}, \texttt{pln\_api.metta}).
+
+\paragraph{AF versus $F$.}
+$\mathrm{AF}$ is the live ECAN attentional focus. $F$ is the premise-control set used by the influenced arm. On CIP-derived maps, default \texttt{freeze-f} sets $F$ to a top-STI subset of exported AF of size at most $k$ (focus cap), keeping query atoms when possible. \texttt{re-dynamics} re-seeds and runs a small ECAN on the extracted graph instead of using a frozen $F$.
+
+\subsection{Protocols}
+
+\paragraph{Steering.}
+Under fixed $B$, three arms share the same query $Q$:
+\begin{itemize}
+    \item \textbf{weighted}: all premises (full table KB);
+    \item \textbf{influenced}: premises kept by the query-conditioned filter against real focus $F$ ($C_Q\wedge F$);
+    \item \textbf{distracted}: same filter against a random set $S$ with $|S|=|F|$ (seeded RNG).
+\end{itemize}
+Primary outputs: per-arm solved flag, confidence, $n_{\mathrm{premises}}$, \texttt{wall\_ms}; contrasts such as whether influenced solves when distracted does not.
+
+\paragraph{Feedback.}
+An AF- (or $F$-) filtered successful path yields proof-related atoms (stamp legs). Those atoms receive an STI wage and one ECAN cycle re-settles attention. Metrics include STI gain on proof objects and focus membership before/after. 
+
+Bridge-side feedback runs in the PLN process; CIP-side wage (closed loop) stimulates original CIP atom names in the live CIP process after a mid-run probe.
+
+\subsection{Map sources and entry points}
+
+\paragraph{Hardcoded Tabulated maps.}
+Hand-written scenarios (\texttt{roman}, \texttt{slice}) under \texttt{bridge/scenarios/}. Driver: \texttt{run\_bridge.py} (\texttt{steering} / \texttt{feedback} / suite over budgets).
+
+\paragraph{CIP-derived Tabulated maps.}
+Attention export is shared: 
+
+\texttt{export\_snapshot.write\_attention\_snapshot} with \texttt{schedule} either at the end or midrun.
+\begin{itemize}
+    \item \textbf{end-of-run:} \texttt{mve\_bridge.py} exports \texttt{output/mve/bridge\_snapshot.json}, then optionally runs an offline grid (modes $\times\,k\times B$).
+    \item \textbf{mid-run:} \texttt{mve\_pln\_probe.py} injects hooks into a temporary mve; 
+    
+    probes write \texttt{output/mve/probes/cip\_$i$.json}. 
+    
+    Offline grids reuse those files without replaying the mve. 
+    
+    Optional closed-loop wage needs to be live.
+\end{itemize}
+
+\subsection{Outputs layout}
+
+Results under \texttt{output/cognitive\_synergy/}: per-cell directories named with mode, $k$, and $B$ (mid-run cells include \texttt{cip}$i$); \texttt{summary.json} and \texttt{metrics.csv} per cell; B2 comparison table under \texttt{ablations/from\_*/}; B3 trajectory under \texttt{mve\_pln\_probe/protocol\_probes.csv}.
+
 \begin{thebibliography}{99}
 
 \bibitem{ECAN}
@@ -458,8 +517,18 @@ Sellman, G. \& Goertzel, B. (2011).
 \textit{Using Economic Attention Networks for Controlling Embodied Intelligent Systems}.
 
 \bibitem{nldapli}
-Goertzel, B. et al.
+Goertzel, B., et al.
 \textit{Using Nonlinear Dynamical Attention Allocation to Focus Probabilistic Logical Inference Upon Relevant Information}.
+
+\bibitem{tauSLD}
+Finkelstein, S., Freyd, P., \& Lipton, J. (1994).
+\textit{Logic Programming in Tau Categories}.
+In: Computer Science Logic (CSL '94).
+
+\bibitem{allegories}
+Freyd, P., \& Scedrov, A. (1990).
+\textit{Categories, Allegories}.
+North-Holland.
 
 \end{thebibliography}
 

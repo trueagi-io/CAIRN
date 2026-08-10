@@ -1,0 +1,23 @@
+; Roman map — V={A,B,C,D}; query (Inheritance A D). ECAN-safe (no STV/1).
+; AF size 3 + 1 cycle: diffusion can pull an intermediate into F while Q stays.
+; Output paths (fx-name / fx-out / fx-out-feedback) are set by run_bridge driver.
+(= (fx-query-label) "Inheritance A D")
+(= (fx-af-size) 3.0)
+(= (fx-cycles) 1)
+(= (fx-n-tables) 4)
+(= (fx-seeds) (cons A (cons D ())))
+(= (fx-objects) (cons A (cons B (cons C (cons D ())))))
+(= (fx-pool) ("A" "B" "C" "D"))
+(= (fx-tables)
+   (cons (Table 1 Inheritance (cons A (cons B ())) (stv 0.25 0.9) (1))
+   (cons (Table 2 Inheritance (cons A (cons C ())) (stv 0.25 0.9) (2))
+   (cons (Table 3 Inheritance (cons B (cons D ())) (stv 0.5 0.9) (3))
+   (cons (Table 4 Inheritance (cons C (cons D ())) (stv 0.5 0.9) (4))
+        ())))))
+(= (fx-query-term) (Inheritance A D))
+(= (fx-query-objects) (cons A (cons D ())))
+(= (fx-kb-full)
+   ((Sentence ((Inheritance A B) (stv 0.25 0.9)) (1))
+    (Sentence ((Inheritance A C) (stv 0.25 0.9)) (2))
+    (Sentence ((Inheritance B D) (stv 0.5 0.9)) (3))
+    (Sentence ((Inheritance C D) (stv 0.5 0.9)) (4))))

@@ -1,0 +1,11 @@
+; Slice node priors — import AFTER ECAN seed (STV arity clash).
+!(import! &self (library lib_pln))
+(= (STV Ant) (stv 0.5 0.9))
+(= (STV Bee) (stv 0.5 0.9))
+(= (STV Hymenopter) (stv 0.4 0.9))
+(= (STV Insect) (stv 0.5 0.9))
+(= (STV Arthropod) (stv 0.5 0.9))
+(= (STV Invertebrate) (stv 0.5 0.9))
+(= (STV Arachnid) (stv 0.3 0.9))
+(= (STV Millipede) (stv 0.3 0.9))
+(= (STV Trilobite) (stv 0.3 0.9))

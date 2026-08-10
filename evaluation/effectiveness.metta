@@ -61,7 +61,7 @@
         (+ $r (+ $c $d))))
 
 ; ---- §2.2.4  Effectiveness -----------------------------------
-; Primary reported value is global (baseline → current).
+; Primary reported value is total (baseline → current).
 
 (= (calculate-effectiveness $from $to)
    (let* (($perf-delta    (aggregate-metric-delta $from $to))
@@ -70,10 +70,10 @@
             (/ $perf-delta $resource-cost)
             0.0)))
 
-(= (measure-local-effectiveness $prev $curr)
+(= (measure-partial-effectiveness $prev $curr)
    (calculate-effectiveness $prev $curr))
 
-(= (measure-global-effectiveness $baseline $curr)
+(= (measure-total-effectiveness $baseline $curr)
    (calculate-effectiveness $baseline $curr))
 
 ; ---- §2.2.5  Redundancy Degradation Test ---------------------

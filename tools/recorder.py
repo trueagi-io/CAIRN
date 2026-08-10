@@ -63,7 +63,7 @@ def _ensure_dashboard_running():
 CSV_FIELDS = [
     'cip_index', 'timestamp', 'af_size',
     'af_size_ratio', 'sti_concentration', 'link_density',
-    'effectiveness', 'local_effectiveness', 'metric_delta', 'resource_cost',
+    'effectiveness', 'partial_effectiveness', 'metric_delta', 'resource_cost',
     'attention_coherence', 'context_retention',
     'distributed_importance', 'selective_modulation', 'connection_ratio',
     'preallocation_space',
@@ -88,13 +88,13 @@ def init_recorder(output_dir='output', prefix=''):
 
 def record_cip(cip_index, af_size,
                af_size_ratio, sti_concentration, link_density,
-               effectiveness='N/A', local_effectiveness='N/A',
+               effectiveness='N/A', partial_effectiveness='N/A',
                metric_delta='N/A', resource_cost='N/A',
                attention_coherence=0.0, context_retention='N/A',
                distributed_importance=0.0, selective_modulation=0.0,
                connection_ratio=0.0, preallocation_space=0.0,
                triangles=0, betti_0=0, betti_1=0, betti_2=0):
-    """effectiveness = global (baseline→curr); local_effectiveness = prev→curr."""
+    """effectiveness = total (baseline→curr); partial_effectiveness = prev→curr."""
     global _csv_writer, _csv_file
     if _csv_writer is None:
         return 'no_recorder'
@@ -106,7 +106,7 @@ def record_cip(cip_index, af_size,
         'sti_concentration': float(sti_concentration),
         'link_density': float(link_density),
         'effectiveness': _float_or_na(effectiveness),
-        'local_effectiveness': _float_or_na(local_effectiveness),
+        'partial_effectiveness': _float_or_na(partial_effectiveness),
         'metric_delta': _float_or_na(metric_delta),
         'resource_cost': _float_or_na(resource_cost),
         'attention_coherence': _safe_float(attention_coherence),

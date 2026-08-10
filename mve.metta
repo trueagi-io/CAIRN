@@ -1,14 +1,14 @@
 ; =============================================================
-; CAIRN – MVE
+; CAIRN – MVE (structural CIP)
 ;
-; Insect/poison run with full metric set: resource, local/global
-; effectiveness, assessment (coherence, retention, distributed
-; importance, selective modulation, connection ratio), audit,
-; probe, topology.
+; Full metric set on insect/poison: resource, effectiveness,
+; assessment (incl. distributed importance), audit, probe, topology.
 ;
-; Run from the CAIRN directory:
-;   source venv/bin/activate
-;   ../PeTTa/run.sh mve.metta
+; Pathway: demo → mve → assignment
+;                ↘ mve_bridge   (PLN coupling — not this file)
+;
+;   source venv/bin/activate && ../PeTTa/run.sh mve.metta
+; Output: output/mve/
 ; =============================================================
 
 ; ---- Polyfills for hyperon builtins not in PeTTa -------------
@@ -106,8 +106,8 @@
           ($ratio   (measure-af-size-ratio))
           ($conc    (measure-sti-concentration))
           ($density (measure-link-density))
-          ($eff-g   (measure-global-effectiveness $baseline-snap $snap))
-          ($eff-l   (measure-local-effectiveness $prev-snap $snap))
+          ($eff-g   (measure-total-effectiveness $baseline-snap $snap))
+          ($eff-l   (measure-partial-effectiveness $prev-snap $snap))
           ($delta   (aggregate-metric-delta $prev-snap $snap))
           ($cost    (total-resource-cost))
           ($topo    (persistent-homology-invariants))
@@ -254,5 +254,6 @@
 !(py-call (recorder.close_recorder))
 !(println! (Results written to output/mve/metrics.csv and output/mve/summary.json))
 
+; Structural CIP only (demo → mve → assignment). Bridge: python bridge/mve_bridge.py
 !(println! ())
 !(println! (Done.))

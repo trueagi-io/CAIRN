@@ -1,28 +1,14 @@
 ; =============================================================
-; CAIRN - Assignment: MVE Benchmark
+; CAIRN – Assignment (structural CIP corpus benchmark)
 ;
-; mve.metta's exact pipeline and ECAN parameters, run against the
-; real insect/poison corpus from data/sentences/ instead of
-; metta-attention's bundled 35-sentence insect-sent.metta.
+; Same pipeline/params as mve on data/sentences/ insects-100 +
+; poisons-50; gained-efficiency vs mve baseline.
 ;
-; Data: data/sentences/insects-100.sent (100 sentences) then
-; data/sentences/poisons-50.sent (50 sentences), concatenated in
-; that order via utils.load_sentences (accepts a list of paths --
-; see tools/utils.py) to reproduce the topic-switch structure of
-; the original data/launch_exp.py experiment_1 at real scale
-; (mve's own bundled data only has 2 poison-ish sentences tacked
-; onto the end of an otherwise all-insect list).
+; Pathway: demo → mve → assignment   (no bridge / no PLN)
+;                ↘ mve_bridge        (coupled branch — separate)
 ;
-; Ends by comparing its own run against mve.metta's baseline via
-; measure-gained-efficiency-from-eff (evaluation/benchmark.metta) --
-; requires mve.metta to have been run already (reads output/mve/metrics.csv).
-;
-; Run from CAIRN/ (mve.metta first, then):
-;   source venv/bin/activate
-;   ../PeTTa/run.sh mve.metta
-;   ../PeTTa/run.sh assignment.metta
-;
-; Output: output/benchmark/ (metrics.csv, trends.csv, summary.json)
+;   ../PeTTa/run.sh mve.metta && ../PeTTa/run.sh assignment.metta
+; Output: output/benchmark/
 ; =============================================================
 
 ; ---- Polyfills for hyperon builtins not in PeTTa -------------
@@ -141,8 +127,8 @@
           ($ratio   (measure-af-size-ratio))
           ($conc    (measure-sti-concentration))
           ($density (measure-link-density))
-          ($eff-g   (measure-global-effectiveness $baseline-snap $snap))
-          ($eff-l   (measure-local-effectiveness $prev-snap $snap))
+          ($eff-g   (measure-total-effectiveness $baseline-snap $snap))
+          ($eff-l   (measure-partial-effectiveness $prev-snap $snap))
           ($delta   (aggregate-metric-delta $prev-snap $snap))
           ($cost    (total-resource-cost))
           ($topo    (persistent-homology-invariants))
@@ -301,5 +287,6 @@
           ($_ (println! (This-run-mean-effectiveness: $opt-eff))))
       (println! (Gained-efficiency: $gained))))
 
+; Structural CIP only (corpus benchmark). Synergy branch is mve_bridge, not assignment.
 !(println! ())
 !(println! (Done.))

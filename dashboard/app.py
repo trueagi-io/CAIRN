@@ -1,23 +1,23 @@
-"""CAIRN live evaluation dashboard.
+"""CAIRN evaluation dashboard — structural CIP + cognitive synergy (separate).
 
-Run with: streamlit run dashboard/app.py --server.port 8501
-(from the CAIRN/ directory, with venv activated)
+Run: streamlit run dashboard/app.py --server.port 8501
+(from CAIRN/, venv active)
 
-Also auto-launched by tools/recorder.py's init_recorder() at the start of any
-eval run (demo.metta, mve.metta, assignment.metta) if it isn't already up.
+Surfaces never share chart series:
+  structural        — demo / mve / assignment CIP time series
+  cognitive_synergy — bridge steering/feedback protocol results
 """
 
 import sys
+import time
 from pathlib import Path
 
-# Ensure sibling modules (data.py, charts.py, live_view.py, completed_view.py)
-# import cleanly regardless of whether the runner puts this script's own
-# directory on sys.path (streamlit's CLI and its AppTest harness differ here).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import streamlit as st
 
 import charts
+import cognitive_synergy_view
 import completed_view
 import data
 import live_view
@@ -57,15 +57,18 @@ def _inject_css():
     """, unsafe_allow_html=True)
 
 
-@st.cache_data(ttl=3)
-def _cached_discover_runs(output_root_str: str):
-    return data.discover_runs(Path(output_root_str))
+@st.cache_data(ttl=30, show_spinner=False)
+def _cached_all_runs(output_root_str: str):
+    return data.discover_all_runs(Path(output_root_str))
 
 
-def _format_run_label(run):
+def _format_run_label(run: data.RunInfo) -> str:
     badge = _STATE_BADGE.get(run.state, '')
     if run.state == 'complete':
-        finished = _relative_time(_age_seconds(run.summary_path.stat().st_mtime))
+        if run.summary_path.exists():
+            finished = _relative_time(_age_seconds(run.summary_path.stat().st_mtime))
+        else:
+            finished = _relative_time(_age_seconds(run.last_modified))
         return f'{badge} {run.label} · complete · finished {finished}'
     if run.state == 'live':
         updated = _relative_time(_age_seconds(run.last_modified))
@@ -75,7 +78,6 @@ def _format_run_label(run):
 
 
 def _age_seconds(mtime):
-    import time
     return max(time.time() - mtime, 0)
 
 
@@ -90,23 +92,101 @@ def _relative_time(seconds):
     return f'{seconds // 86400}d ago'
 
 
+def _pick_default_key(runs: list[data.RunInfo], keys: list[str]) -> str:
+    if not keys:
+        return ''
+    for r in runs:
+        if r.state == 'live':
+            return str(r.directory)
+    return keys[0]
+
+
 def main():
     _inject_css()
     st.title('Evaluation Dashboard')
 
-    runs = _cached_discover_runs(str(OUTPUT_ROOT))
+    all_runs = _cached_all_runs(str(OUTPUT_ROOT))
+    structural = all_runs.get('structural') or []
+    cs_runs = all_runs.get('cognitive_synergy') or []
+
+    if st.sidebar.button('Scan output dir', key='scan_output'):
+        _cached_all_runs.clear()
+        try:
+            cognitive_synergy_view._cached_inventory.clear()
+            cognitive_synergy_view._cached_cs_runs.clear()
+        except Exception:
+            pass
+        st.rerun()
+    surface = st.sidebar.radio(
+        'Surface',
+        ['structural', 'cognitive_synergy'],
+        format_func=lambda s: (
+            'Structural CIP (demo/mve/assignment)'
+            if s == 'structural'
+            else 'Cognitive synergy (bridge)'
+        ),
+        key='surface_kind',
+    )
+
+    if surface == 'structural':
+        runs = structural
+        empty_msg = f'No CIP runs under {OUTPUT_ROOT}/{{demo,mve,benchmark}}'
+    else:
+        runs = cs_runs
+        empty_msg = (
+            f'No bridge runs under {OUTPUT_ROOT}/cognitive_synergy/\n\n'
+            'Run `python bridge/mve_bridge.py` or `python bridge/run_bridge.py suite`.'
+        )
+
+    st.sidebar.caption(
+        f'{len(structural)} structural · {len(cs_runs)} cognitive synergy'
+    )
+
+    # Cognitive synergy: tabbed battery hub (does not require a selected CIP-style run)
+    if surface == 'cognitive_synergy':
+        if not runs:
+            inv = data.battery_inventory(OUTPUT_ROOT)
+            has_product = bool(
+                inv.get('ablations') or inv.get('probes') or inv.get('end_snapshot')
+            )
+            if not has_product:
+                st.warning(empty_msg)
+                st.stop()
+            st.info(
+                'No per-cell metrics.csv yet, but battery products were found — '
+                'showing overview / grids / series.'
+            )
+        cognitive_synergy_view.render_surface(OUTPUT_ROOT, runs)
+        return
+
     if not runs:
-        st.warning(f'No *metrics.csv files found under {OUTPUT_ROOT}')
+        st.warning(empty_msg)
         st.stop()
 
-    st.sidebar.button('Scan output dir', on_click=_cached_discover_runs.clear)
-    selected = st.sidebar.selectbox('Runs', runs, format_func=_format_run_label, index=0)
+    by_key = {str(r.directory): r for r in runs}
+    keys = list(by_key.keys())
+    sess_key = f'selected_run_dir_{surface}'
+    default_key = _pick_default_key(runs, keys)
 
+    if sess_key not in st.session_state or st.session_state[sess_key] not in by_key:
+        st.session_state[sess_key] = default_key
+
+    selected_key = st.sidebar.selectbox(
+        'Runs',
+        keys,
+        format_func=lambda k: _format_run_label(by_key[k]),
+        key=sess_key,
+    )
+    selected = by_key[selected_key]
+
+    # Structural CIP views
     if selected.state == 'stale':
         t = data.STALE_THRESHOLD_SECONDS
         label = f'{t // 60}m' if t >= 60 else f'{t}s'
-        st.warning(f'No summary.json and no metrics.csv update in over {label} '
-                   '— this run may have crashed or been abandoned.')
+        st.warning(
+            f'No summary.json and no CIP activity in over {label} '
+            '— this run may have crashed or been abandoned.'
+        )
         live_view.render(selected)
     elif selected.state == 'live':
         live_view.render(selected)

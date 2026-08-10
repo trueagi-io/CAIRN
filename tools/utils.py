@@ -46,7 +46,11 @@ from scipy.stats import pearsonr, entropy
 # ---- MeTTa edge-list → networkx Graph glue ----------------------------
 
 def _node_key(n):
-    return str(n) if isinstance(n, list) else n
+    """Canonical node id for graphs. Always str so sorted() never mixes str/int
+    (PeTTa/Janus may hand through bare ints, floats, or nested lists)."""
+    if isinstance(n, list):
+        return str(tuple(_node_key(x) for x in n))
+    return str(n)
 
 
 def _build_graph(edges):

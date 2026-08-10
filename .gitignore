@@ -37,10 +37,32 @@ env/
 .DS_Store
 Thumbs.db
 
-# Evaluation output
+# Evaluation / bridge output (regenerate via demo/mve/assignment/cognitive_synergy)
 *.csv
 *.zip
 output/
 output*/
 outputs/
 results/
+
+# LaTeX build (keep main.tex; PDF optional to commit)
+references/*.aux
+references/*.log
+references/*.out
+references/*.toc
+references/*.fls
+references/*.fdb_latexmk
+references/*.synctex.gz
+references/*.synctex.gz
+
+# Legacy experiment dumps
+data/log/
+
+# Local bridge temp drivers
+bridge/_tmp*.metta
+bridge/_ecan*.metta
+_mve_bridge_*.metta
+_mve_pln_probe_*.metta
+
+# Generated coupled scenarios
+bridge/scenarios/generated/

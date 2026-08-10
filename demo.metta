@@ -1,13 +1,11 @@
 ; =============================================================
-; CAIRN – Evaluation Pipeline Demo
+; CAIRN – Demo (structural CIP smoke)
 ;
-; Full reproduction of the metta-attention insect/poison
-; experiment with CAIRN recording CIP snapshots and attention
-; metrics at each agent-run boundary.
+; Insect/poison with CIP snapshots / core metrics.
+; Pathway: demo → mve → assignment
 ;
-; Run from the CAIRN directory:
-;   source venv/bin/activate
-;   ../PeTTa/run.sh demo.metta
+;   source venv/bin/activate && ../PeTTa/run.sh demo.metta
+; Output: output/demo/
 ; =============================================================
 
 ; ---- Polyfills for hyperon builtins not in PeTTa -------------
@@ -87,6 +85,7 @@
 !(updateAttentionParam TOPK 0.5)
 
 ; ---- Result recording ----------------------------------------
+; Writes to output/demo/ (alongside mve → output/mve/, assignment → output/benchmark/).
 
 !(cairn-init-recorder)
 !(bind! &last-snap (new-state none))
