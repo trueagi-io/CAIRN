@@ -1,17 +1,24 @@
 # ECAN–PLN bridge
 
-Controlled **cognitive synergy** experiments: attention steers budgeted PLN
-(steering) and proofs reweight STI (feedback). 
+**Attention dilation** experiments toward architectural **cognitive synergy**
+(ECAN ↔ PLN): under fixed PLN budget \(B\), ECAN-derived focus sets the aperture
+of dualized premises available to inference; optional wage feeds proof atoms
+back into live AF. 
 
-**Containment:** `CAIRN/bridge/` + `tools/bridge_export.metta` / `tools/cip_probe_hooks.metta`.  
-PeTTa / metta-attention / hyperon are **import-only**.
+| Layer | Term | Description |
+|-------|------|-----------------|
+| Architecture | Cognitive Synergy | subsystems help each other when coupled |
+| Experiment | Attention Dilation | W / I / D protocols under parametric \(B\) |
+| Thesis | Effective Attention | Real Focus vs. full KB vs. random \(S\) |
+
+**Weighted** (full dualized KB) · **Influenced** (\(C_Q\wedge F\)) · **Distracted** (\(C_Q\wedge S\), \(\lvert S\rvert=\lvert F\rvert\)).
 
 ---
 
 ## Experiment ladder
 
 ```text
-STRUCTURAL                          COGNITIVE SYNERGY
+STRUCTURAL                          ATTENTION DILATION (toward cog. synergy)
 demo → mve → assignment             B1  tabulated suite (roman|slice)
                                       B2  coupled workshop — end-of-run / grid
                                       B3  coupled workshop — mid-run CIP schedule
@@ -24,11 +31,10 @@ demo → mve → assignment             B1  tabulated suite (roman|slice)
 
 | Protocol | Arms / flow | Question |
 |----------|-------------|----------|
-| **steering** | **weighted** / **influenced** / **distracted**, same \(B\) | Does attention-shaped premise selection change solve under fixed PLN steps? |
-| **feedback** | One AF-filtered proof → wage proof atoms → one ECAN cycle | Does a successful AF path reweight STI / AF? |
+| **steering** | **weighted** / **influenced** / **distracted**, same \(B\) | Does Attention Dilation impact solve capabilities? |
+| **feedback** | One \(C_Q\wedge F\) proof → wage proof atoms → optional ECAN cycle | Does a successful path reweight STI / AF? |
 
 Timing: `PLN.Query` **wall_ms** per arm (or feedback pln), via `pln-query-timed`.  
-Still under fixed \(B\) — speed is capped-solver wall time, not unlimited search.
 
 ---
 
@@ -247,8 +253,8 @@ output/cognitive_synergy/
     cells/cip_{i}/summary.json
 ```
 
-Dashboard (**Cognitive synergy** surface): tabs **Overview · B2 grid · B3/B4 trajectories · Single cell**
-(open vs closed series, ablations charts, battery inventory).
+Dashboard (**Cognitive synergy** surface — labels historical; battery is attention
+dilation): **Overview · B2 grid · B3/B4 trajectories · Single cell**.
 
 ---
 
