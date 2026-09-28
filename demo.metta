@@ -108,9 +108,9 @@
               ($_ (println! (stimulating: $now))))
            (if (or (== (% $counter (batch)) 0) (== $rest ()))
                (let* (($_ (println! (--- Running agents batch boundary ---)))
-                      ($_ (collapse (test-superpose &incident)))
+                      ($_ (collapse (agent-runner &incident)))
                       ($_ (println! (agents done - recording CIP series)))
-                      ($_ (record-cip-series))
+                      ($_ (timed-record-cip-series))
                       ($_ (println! (CIP series done - snapshot-now)))
                       ($snap (snapshot-now $cip-index))
                       ($_ (change-state! &last-snap $snap))
@@ -135,8 +135,8 @@
 
 ; Baseline CIP -- each step is logged. If the run goes silent after
 ; a "starting" line, that step is the stall (not a mystery hang).
-!(println! (baseline starting record-cip-series full-typeSpace STI-LTI scan))
-!(record-cip-series)
+!(println! (baseline starting record-af-cip-series attentional-focus only))
+!(timed-record-cip-series)
 !(println! (baseline record-cip-series done - snapshot-now 0))
 !(bind! &baseline-snap (new-state (snapshot-now 0)))
 !(println! (baseline snapshot-now done - cairn-record-cip-baseline 0))
@@ -166,7 +166,7 @@
 !(println! (--- Topology ---))
 !(let $hlinks (get-all-hlinks)
    (println! (Hebbian-links: (size-atom $hlinks))))
-!(let $report (persistent-homology-invariants)
+!(let $report (persistent-homology-final)
    (let* (($_ (println! (Triangles: (topology-triangles $report))))
           ($_ (println! (Connected-components: (topology-betti-0 $report))))
           ($_ (println! (Independent-cycles: (topology-betti-1 $report))))

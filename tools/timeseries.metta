@@ -36,27 +36,42 @@
 
 ; ---- Record -------------------------------------------------
 
-; Append current STI and LTI of every atom to their series.
-; Call at each CIP boundary before the AtomSpace is updated.
+; STI and LTI from one value cell. Same two shapes as typespace-value-sti.
+; A cell with neither shape contributes (0.0 0.0) rather than a second lookup.
+(= (typespace-value-pair $value)
+   (case $value
+     ( ( ((AV $sti $lti $vlti) (Bin $bin)) ($sti $lti))
+       ( (((stv $a $b) (AV $sti $lti $vlti)) (Bin $bin)) ($sti $lti))
+       ($else (0.0 0.0)) )))
+
+(= (append-series $space $tag $atom $curr)
+   (let $prev (series-get $space $tag $atom)
+        (let* (($new (cons-atom $curr $prev))
+               ($_ (if (== $prev ())
+                       ()
+                       (remove-atom $space ($tag $atom $prev))))
+               ($_ (add-atom $space ($tag $atom $new))))
+             done)))
+
+(= (record-one-sample $atom ($sti $lti))
+   (let* (($_ (append-series &sti-series sti-entry $atom $sti))
+          ($_ (append-series &lti-series lti-entry $atom $lti)))
+        done))
+
+; One pass over &typeSpace. Does not call getSti or getLti per atom.
 (= (record-cip-series)
-   (let $all-atoms (getAtomsInTypeSpace)
-        (collapse
-            (let $atom (superpose $all-atoms)
-                 (let* (($curr-sti  (getSti $atom))
-                        ($curr-lti  (getLti $atom))
-                        ($prev-sti  (series-get &sti-series sti-entry $atom))
-                        ($prev-lti  (series-get &lti-series lti-entry $atom))
-                        ($new-sti   (cons-atom $curr-sti $prev-sti))
-                        ($new-lti   (cons-atom $curr-lti $prev-lti))
-                        ($_ (if (== $prev-sti ())
-                                ()
-                                (remove-atom &sti-series (sti-entry $atom $prev-sti))))
-                        ($_ (if (== $prev-lti ())
-                                ()
-                                (remove-atom &lti-series (lti-entry $atom $prev-lti))))
-                        ($_ (add-atom &sti-series (sti-entry $atom $new-sti)))
-                        ($_ (add-atom &lti-series (lti-entry $atom $new-lti))))
-                      done)))))
+   (collapse
+      (match &typeSpace ($atom $value)
+             (record-one-sample $atom (typespace-value-pair $value)))))
+
+; Demo path. The trend summary reads only the attentional focus, so links
+; and atoms outside the focus are not given a history.
+(= (record-af-cip-series)
+   (collapse
+      (match &typeSpace ($atom $value)
+             (if (isAtomInAf $atom)
+                 (record-one-sample $atom (typespace-value-pair $value))
+                 ()))))
 
 ; ---- Read ---------------------------------------------------
 

@@ -37,6 +37,9 @@ env/
 .DS_Store
 Thumbs.db
 
+# Generated MORK-scan workspace (facts, dumps). Snapshots and the harness stay.
+experiments/mork_scan/work/
+
 # Evaluation / bridge output (regenerate via demo/mve/assignment/cognitive_synergy)
 *.csv
 *.zip

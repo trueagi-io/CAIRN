@@ -38,13 +38,23 @@
 ; Single py-call: one graph build, size-bounded cliques, fingerprint cache.
 ; Python returns a 4-list [tri, b0, b1, b2]; unpack with car/cdr so both
 ; Prolog lists and Expression-shaped returns work under PeTTa/Janus.
+(= (topology-report-from $vals)
+   (let* (($t  (car-atom $vals))
+          ($r1 (cdr-atom $vals))
+          ($b0 (car-atom $r1))
+          ($r2 (cdr-atom $r1))
+          ($b1 (car-atom $r2))
+          ($b2 (car-atom (cdr-atom $r2))))
+        (TopologyReport $t $b0 $b1 $b2)))
+
+; Per CIP. Triangles, Betti-0 and Betti-1. Betti-2 is deferred.
 (= (persistent-homology-invariants)
    (let $edges (hlinks-to-edge-list)
+        (let $vals (py-call (utils.topology_up_to_triangles $edges))
+             (topology-report-from $vals))))
+
+; End of run. One full complex, including tetrahedra and Betti-2.
+(= (persistent-homology-final)
+   (let $edges (hlinks-to-edge-list)
         (let $vals (py-call (utils.topology_invariants $edges))
-             (let* (($t  (car-atom $vals))
-                    ($r1 (cdr-atom $vals))
-                    ($b0 (car-atom $r1))
-                    ($r2 (cdr-atom $r1))
-                    ($b1 (car-atom $r2))
-                    ($b2 (car-atom (cdr-atom $r2))))
-                   (TopologyReport $t $b0 $b1 $b2)))))
+             (topology-report-from $vals))))

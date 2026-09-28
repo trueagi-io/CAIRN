@@ -151,8 +151,8 @@ def _boundary_columns(simplices, face_to_index):
         yield _boundary_column(simplex, face_to_index)
 
 
-def _triangles_and_tetrahedra_from_adj(adj):
-    """Enumerate 3- and 4-cliques from an adjacency-dict graph.
+def _triangles_and_tetrahedra_from_adj(adj, tetras=True):
+    """Enumerate 3-cliques, and 4-cliques when tetras is true.
 
     Do NOT use networkx.enumerate_all_cliques: it walks every clique size
     and explodes on dense AF graphs (k~70).
@@ -168,6 +168,8 @@ def _triangles_and_tetrahedra_from_adj(adj):
             common = [w for w in nbrs_u[i + 1:] if w in nbrs_v]
             for j, w in enumerate(common):
                 triangles.append(_sorted_simplex((u, v, w)))
+                if not tetras:
+                    continue
                 nbrs_w = adj[w]
                 for x in common[j + 1:]:
                     if x in nbrs_w:
@@ -193,9 +195,11 @@ class TopoState:
         "basis_d1", "basis_d2", "basis_d3",
         "rank_d1", "rank_d2", "rank_d3",
         "_next_v", "_next_e", "_next_t", "_next_tet",
+        "include_tetras",
     )
 
-    def __init__(self):
+    def __init__(self, tetras=True):
+        self.include_tetras = tetras
         self.adj = {}
         self.edges = set()
         self.vertex_index = {}
@@ -216,9 +220,9 @@ class TopoState:
     # ---- construction -------------------------------------------------
 
     @classmethod
-    def from_edge_set(cls, edge_set):
+    def from_edge_set(cls, edge_set, tetras=True):
         """Full rebuild from an undirected edge set (canonical path)."""
-        st = cls()
+        st = cls(tetras=tetras)
         if not edge_set:
             return st
 
@@ -231,7 +235,8 @@ class TopoState:
             st.edge_index[(a, b)] = st._next_e  # edges already sorted
             st._next_e += 1
 
-        triangles, tetrahedra = _triangles_and_tetrahedra_from_adj(st.adj)
+        triangles, tetrahedra = _triangles_and_tetrahedra_from_adj(
+            st.adj, tetras=st.include_tetras)
         for tri in triangles:
             st.triangle_index[tri] = st._next_t
             st._next_t += 1
@@ -267,7 +272,12 @@ class TopoState:
         triangles = n_t
         betti_0 = max(0, n_v - self.rank_d1)
         betti_1 = max(0, n_e - self.rank_d1 - self.rank_d2)
-        betti_2 = max(0, n_t - self.rank_d2 - self.rank_d3)
+        # Without tetrahedra, n_t - rank_d2 is not Betti-2. Report 0 until
+        # a full complex is built at the end of the run.
+        if self.include_tetras:
+            betti_2 = max(0, n_t - self.rank_d2 - self.rank_d3)
+        else:
+            betti_2 = 0
         return (triangles, betti_0, betti_1, betti_2)
 
     # ---- vertex / simplex registration --------------------------------
@@ -343,6 +353,9 @@ class TopoState:
             if _insert_column_mod2(self.basis_d2, col_d2):
                 self.rank_d2 += 1
 
+        if not self.include_tetras:
+            return (n_e, n_t, 0)
+
         # New tetras {a,b,w,x}: pairs of common neighbours that are linked
         common_list = sorted(common, key=_node_key)
         for i, w in enumerate(common_list):
@@ -372,7 +385,10 @@ class TopoState:
 
 
 # Module-level live state for CIP-to-CIP inductive updates.
+# The period path keeps a triangle complex. The end-of-run path keeps
+# a separate full complex, so a deferred Betti-2 does not corrupt it.
 _topo_state = {"state": None}
+_topo_tri_state = {"state": None}
 
 
 def _clique_complex_report(edges):
@@ -390,25 +406,36 @@ def _clique_complex_betti_1_2(edges):
     return b1, b2
 
 
-def topology_invariants(edges):
-    """[triangles, betti0, betti1, betti2] with inductive CIP updates.
+def _b2_label(st, report):
+    if st.include_tetras:
+        return str(report[3])
+    return "deferred"
+
+
+def _topology_update(edges, box, tetras):
+    """Inductive update of one complex.
 
     * Same edge set as last call → free hit.
     * Only new edges vs last state → patch local simplices + GF(2) columns.
-    * Any removed edges → full rebuild (delete path deferred).
+    * Any removed edges, or a mode change → rebuild.
 
-    Logs mode / delta / wall time for stall diagnosis.
+    tetras=False keeps triangles, Betti-0 and Betti-1, and reports Betti-2
+    as deferred. The end-of-run call uses a separate box with tetras=True.
     """
     edge_set = _normalize_edge_set(edges)
-    st = _topo_state["state"]
+    st = box["state"]
     t0 = _time.perf_counter()
+    same_mode = st is not None and st.include_tetras == tetras
 
-    if st is not None and edge_set == st.edges:
+    if same_mode and edge_set == st.edges:
         report = st.report()
-        print(f"[topo] cache hit edges={len(edge_set)}", flush=True)
+        print(
+            f"[topo] cache hit edges={len(edge_set)} b2={_b2_label(st, report)}",
+            flush=True,
+        )
         return list(report)
 
-    if st is not None and edge_set.issuperset(st.edges):
+    if same_mode and edge_set.issuperset(st.edges):
         added = edge_set - st.edges
         n_e, n_t, n_tet = st.add_edges(added)
         report = st.report()
@@ -417,31 +444,41 @@ def topology_invariants(edges):
             f"[topo] incremental +edges={len(added)} "
             f"new_e={n_e} new_tri={n_t} new_tet={n_tet} "
             f"edges={len(edge_set)} tri={report[0]} "
-            f"b0={report[1]} b1={report[2]} b2={report[3]} "
+            f"b0={report[1]} b1={report[2]} b2={_b2_label(st, report)} "
             f"ms={dt * 1000:.1f}",
             flush=True,
         )
         return list(report)
 
-    # Full rebuild: cold start, or edge deletions present.
-    removed = 0 if st is None else len(st.edges - edge_set)
-    st = TopoState.from_edge_set(edge_set)
-    _topo_state["state"] = st
+    removed = 0 if st is None or not same_mode else len(st.edges - edge_set)
+    st = TopoState.from_edge_set(edge_set, tetras=tetras)
+    box["state"] = st
     report = st.report()
     dt = _time.perf_counter() - t0
     mode = "rebuild" if removed else "full"
     print(
         f"[topo] {mode} removed={removed} edges={len(edge_set)} "
-        f"tri={report[0]} b0={report[1]} b1={report[2]} b2={report[3]} "
-        f"ms={dt * 1000:.1f}",
+        f"tri={report[0]} b0={report[1]} b1={report[2]} "
+        f"b2={_b2_label(st, report)} ms={dt * 1000:.1f}",
         flush=True,
     )
     return list(report)
 
 
+def topology_invariants(edges):
+    """[triangles, betti0, betti1, betti2], including tetrahedra."""
+    return _topology_update(edges, _topo_state, True)
+
+
+def topology_up_to_triangles(edges):
+    """Period path. Betti-2 is deferred to topology_invariants at the end."""
+    return _topology_update(edges, _topo_tri_state, False)
+
+
 def reset_topology_state():
     """Drop live TopoState (tests / fresh runs)."""
     _topo_state["state"] = None
+    _topo_tri_state["state"] = None
 
 
 def count_voids(edges):

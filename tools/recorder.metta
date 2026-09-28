@@ -50,7 +50,8 @@
                   $ratio $conc $density
                   $eff-g $eff-l $delta $cost
                   0.0 "N/A" 0.0 0.0 0.0 0.0
-                  $tri $b0 $b1 $b2))))
+                  $tri $b0 $b1 $b2)))
+          ($_ (maybe-dump-cip-edges $cip-index)))
       (println! (record-cip written $cip-index))))
 
 ; Record metrics at a CIP boundary without deltas (baseline).
@@ -82,12 +83,12 @@
    (let* (($ratio   (measure-af-size-ratio))
           ($conc    (measure-sti-concentration))
           ($density (measure-link-density))
-          ($topo    (persistent-homology-invariants))
+          ($topo    (persistent-homology-final))
           ($tri     (topology-triangles $topo))
           ($b0      (topology-betti-0 $topo))
           ($b1      (topology-betti-1 $topo))
           ($b2      (topology-betti-2 $topo))
-          ($hcount  (size-atom (get-all-hlinks)))
+          ($hcount  (hebbian-link-count))
           ($eff     (measure-total-effectiveness $baseline-snap $final-snap))
           ($trends  (cairn-collect-af-trends)))
       (py-call (recorder.write_summary
@@ -118,3 +119,54 @@
                            ($vol   (sti-volatility $atom)))
                        (TrendEntry $atom $trend $vol))
                     (empty))))))
+
+; ---- MORK scan profile (CAIRN_EDGE_DUMP=1) -------------------
+; Default runs do not print these lines and do not write edge files.
+; The flag gates a read-only Hebbian snapshot at CIP 1, CIP 5, and the
+; end of the demo, plus wall times for the two scans the experiment compares.
+
+(= (edge-dump-enabled)
+   (py-call (recorder.edge_dump_enabled)))
+
+(= (timed-record-cip-series)
+   (if (edge-dump-enabled)
+       (let* (($t0 (current-time))
+              ($_ (record-af-cip-series))
+              ($t1 (current-time)))
+            (println! (record-cip-series-seconds (- $t1 $t0))))
+       (record-af-cip-series)))
+
+(= (edge-dump-row (ASYMMETRIC_HEBBIAN_LINK $s $t))
+   ($s $t (get-hlink-probability $s $t)))
+
+; Time get-all-hlinks alone, then attach means and write JSON.
+; Returns the link count so the summary can reuse this scan.
+(= (dump-timed-edges $label)
+   (let* (($t0 (current-time))
+          ($links (get-all-hlinks))
+          ($t1 (current-time))
+          ($n (size-atom $links))
+          ($_ (println! (hlink-scan $label seconds (- $t1 $t0) count $n)))
+          ($rows (collapse (let $e (superpose $links) (edge-dump-row $e))))
+          ($_ (py-call (recorder.dump_hebbian_edges $label $rows))))
+        $n))
+
+(= (dump-label $cip-index)
+   (if (or (== $cip-index 1) (== $cip-index 1.0))
+       cip1
+       (if (or (== $cip-index 5) (== $cip-index 5.0))
+           cip5
+           none)))
+
+(= (maybe-dump-cip-edges $cip-index)
+   (if (edge-dump-enabled)
+       (let $label (dump-label $cip-index)
+            (if (== $label none)
+                skipped
+                (dump-timed-edges $label)))
+       skipped))
+
+(= (hebbian-link-count)
+   (if (edge-dump-enabled)
+       (dump-timed-edges final)
+       (size-atom (get-all-hlinks))))

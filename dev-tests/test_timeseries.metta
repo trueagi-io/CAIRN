@@ -5,17 +5,14 @@
 
 ; ---- Stub metta-attention API --------------------------------
 
-!(bind! &stub-sti (new-space))
-!(bind! &stub-lti (new-space))
+; record-cip-series reads the value cell in one pass, not getSti/getLti.
+!(bind! &typeSpace (new-space))
+!(add-atom &typeSpace (a ((AV 8.0 0.9 0) (Bin 0))))
+!(add-atom &typeSpace (b ((AV 3.0 0.4 0) (Bin 0))))
 
-!(add-atom &stub-sti (sti a 8.0))
-!(add-atom &stub-sti (sti b 3.0))
-!(add-atom &stub-lti (lti a 0.9))
-!(add-atom &stub-lti (lti b 0.4))
-
-(= (getAtomsInTypeSpace) (a b))
-(= (getSti $atom) (match &stub-sti (sti $atom $val) $val))
-(= (getLti $atom) (match &stub-lti (lti $atom $val) $val))
+(= (set-sample! $atom $oldsti $oldlti $sti $lti)
+   (let* (($_ (remove-atom &typeSpace ($atom ((AV $oldsti $oldlti 0) (Bin 0))))))
+        (add-atom &typeSpace ($atom ((AV $sti $lti 0) (Bin 0))))))
 
 ; ---- Load module under test ----------------------------------
 
@@ -28,10 +25,6 @@
        (println! (PASS $label))
        (println! (FAIL $label expected: $expected got: $actual))))
 
-(= (update-sti! $atom $old $new)
-   (let* (($_ (remove-atom &stub-sti (sti $atom $old))))
-        (add-atom &stub-sti (sti $atom $new))))
-
 ; ---- CIP 1: record initial values ---------------------------
 
 !(record-cip-series)
@@ -42,9 +35,8 @@
 
 ; ---- CIP 2: shift attention, record again -------------------
 
-!(update-sti! a 8.0 9.5)
-!(update-sti! b 3.0 2.0)
-
+!(set-sample! a 8.0 0.9 9.5 0.9)
+!(set-sample! b 3.0 0.4 2.0 0.4)
 !(record-cip-series)
 
 ; Expected: oldest-first, so cip-1 value then cip-2 value

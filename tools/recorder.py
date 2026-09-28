@@ -71,6 +71,64 @@ CSV_FIELDS = [
 ]
 
 
+def edge_dump_enabled():
+    """True only for the MORK scan profile (CAIRN_EDGE_DUMP=1)."""
+    return os.environ.get('CAIRN_EDGE_DUMP') == '1'
+
+
+def _as_list(x):
+    if x is None:
+        return []
+    if isinstance(x, (list, tuple)):
+        return list(x)
+    return [x]
+
+
+def _node_str(x):
+    if isinstance(x, (list, tuple)):
+        return '(' + ' '.join(_node_str(y) for y in x) + ')'
+    return str(x)
+
+
+def _edge_rows(edges):
+    """Accept a list of (src tgt mean) rows, or one bare row."""
+    rows = _as_list(edges)
+    if rows and not isinstance(rows[0], (list, tuple)):
+        return [rows]
+    return rows
+
+
+def dump_hebbian_edges(label, rows):
+    """Write directed Hebbian edges as JSON. No-op unless CAIRN_EDGE_DUMP=1.
+
+    Records keep direction. The undirected projection used for triangles is
+    applied later, when the snapshot is prepared for MORK.
+    """
+    if not edge_dump_enabled():
+        return 0
+    records = []
+    for row in _edge_rows(rows):
+        if not isinstance(row, (list, tuple)) or len(row) < 2:
+            continue
+        try:
+            mean = float(row[2]) if len(row) >= 3 else 0.0
+        except (TypeError, ValueError):
+            mean = 0.0
+        records.append({
+            'src': _node_str(row[0]),
+            'tgt': _node_str(row[1]),
+            'mean': mean,
+        })
+    safe = ''.join(ch for ch in str(label) if ch.isalnum() or ch in '-_') or 'edges'
+    out_dir = _output_dir or 'output/demo'
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, f'edges_{safe}.json')
+    with open(path, 'w', encoding='utf-8') as handle:
+        json.dump(records, handle)
+    print(f'[edge-dump] {path} edges={len(records)}', flush=True)
+    return len(records)
+
+
 def init_recorder(output_dir='output', prefix=''):
     global _csv_file, _csv_writer, _output_dir, _run_timestamp, _prefix
     _ensure_dashboard_running()

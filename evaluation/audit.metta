@@ -13,6 +13,16 @@
 
 ; ---- §3.3.1  Preallocation Space ----------------------------
 ; H(min-shifted normalized STI) / log2(|atoms|).
+; Named recursions instead of |-> : two lambdas in one clause trip a
+; PeTTa numbervars error once earlier map-flat specializations exist.
+
+(= (shift-sti $min ()) ())
+(= (shift-sti $min (cons $s $rest))
+   (cons (- $s $min) (shift-sti $min $rest)))
+
+(= (scale-sti $total ()) ())
+(= (scale-sti $total (cons $s $rest))
+   (cons (/ $s $total) (scale-sti $total $rest)))
 
 (= (measure-preallocation-space)
    (let* (($atoms (getAtomsInTypeSpace))
@@ -20,10 +30,10 @@
       (if (> $n 1)
           (let* (($stis    (collapse (let $a (superpose $atoms) (getSti $a))))
                  ($min-sti (minimum $stis))
-                 ($shifted (map-flat (|-> ($s) (- $s $min-sti)) $stis))
+                 ($shifted (shift-sti $min-sti $stis))
                  ($total   (sum $shifted))
                  ($dist    (if (> $total 0.0)
-                               (map-flat (|-> ($s) (/ $s $total)) $shifted)
+                               (scale-sti $total $shifted)
                                $shifted))
                  ($entropy (shannon-entropy $dist)))
               (/ $entropy (log-math 2 (* 1.0 $n))))

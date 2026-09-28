@@ -103,7 +103,7 @@
 (= (typespace-value-sti $value)
    (case $value
      ( ( ((AV $sti $lti $vlti) (Bin $bin)) $sti)
-       ( (((STV $a $b) (AV $sti $lti $vlti)) (Bin $bin)) $sti)
+       ( (((stv $a $b) (AV $sti $lti $vlti)) (Bin $bin)) $sti)
        ($else 0.0) )))
 
 ; All STI values in &typeSpace via a single combined scan: getAtomsInTypeSpace

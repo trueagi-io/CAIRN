@@ -155,6 +155,13 @@
 
 (= (batch) 25)
 
+; Clock for the dilution batteries. The six agents and hyperpose are unchanged.
+(= (timed-agent-cycle)
+   (let* (($t0 (current-time))
+          ($_ (collapse (agent-runner &incident)))
+          ($t1 (current-time)))
+        (println! (agent-cycle-seconds (- $t1 $t0)))))
+
 (= (run-experiment-full $expr $counter $cip-index $baseline-snap $prev-snap)
    (if (== $expr ())
        done
@@ -164,7 +171,7 @@
               ($_ (println! (stimulating: $now))))
            (if (or (== (% $counter (batch)) 0) (== $rest ()))
                (let* (($_ (println! (--- Running agents (batch boundary) ---)))
-                      ($_ (collapse (test-superpose &incident)))
+                      ($_ (timed-agent-cycle))
                       ($_ (record-cip-series))
                       ($snap (snapshot-now $cip-index))
                       ($_ (change-state! &last-snap $snap))
@@ -221,7 +228,7 @@
 !(println! (--- Topology ---))
 !(let $hlinks (get-all-hlinks)
    (println! (Hebbian-links: (size-atom $hlinks))))
-!(let $report (persistent-homology-invariants)
+!(let $report (persistent-homology-final)
    (let* (($_ (println! (Triangles: (topology-triangles $report))))
           ($_ (println! (Connected-components: (topology-betti-0 $report))))
           ($_ (println! (Independent-cycles: (topology-betti-1 $report))))
