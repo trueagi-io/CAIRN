@@ -1,8 +1,14 @@
 #!/bin/bash
-# Source this to set up environment variables and aliases for CAIRN development
-# Usage: source environment.sh
+# Source this to set up environment variables and aliases for CAIRN development.
+# Usage, from any directory, in bash or zsh: source /path/to/CAIRN/environment.sh
 
-CAIRN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# zsh does not set BASH_SOURCE. Keep the zsh expansion inside single quotes so
+# bash can still parse this file.
+if [ -n "${ZSH_VERSION:-}" ]; then
+  eval 'CAIRN_ROOT="$(cd "$(dirname "${(%):-%x}")" && pwd)"'
+else
+  CAIRN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 DEV_ENV_ROOT="$(dirname "$CAIRN_ROOT")"
 
 export PETTA_ROOT="$DEV_ENV_ROOT/PeTTa"
