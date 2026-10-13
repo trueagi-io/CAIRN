@@ -5,14 +5,24 @@
 
 ; Soft-fail: probe errors must not abort CIP (Python catches).
 ; Returns wage atom list (may be empty) for optional stimulate.
+(= (maybe-record-hebbian! $cip-index)
+   (let $want (py-call (cip_probe.modules_enabled))
+        (if (== $want True)
+            (py-call (cip_probe.record_hebbian
+                        $cip-index
+                        (bridge-export-hebbian-edges)))
+            ())))
+
 (= (maybe-pln-probe! $cip-index)
    (let $want (py-call (cip_probe.should_probe $cip-index))
         (if (== $want True)
-            (py-call (cip_probe.run_probe
-                        $cip-index
-                        (getAfAtoms)
-                        (bridge-export-sti (getAfAtoms))
-                        (bridge-export-edges)))
+            (let* (($atoms (py-call (cip_probe.run_probe
+                                       $cip-index
+                                       (getAfAtoms)
+                                       (bridge-export-sti (getAfAtoms))
+                                       (bridge-export-edges))))
+                   ($_ (maybe-record-hebbian! $cip-index)))
+              $atoms)
             ())))
 
 ; Stimulate each atom in a flat list returned from Python (closed loop).

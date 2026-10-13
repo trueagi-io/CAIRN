@@ -48,16 +48,6 @@ output*/
 outputs/
 results/
 
-# LaTeX build (keep main.tex; PDF optional to commit)
-references/*.aux
-references/*.log
-references/*.out
-references/*.toc
-references/*.fls
-references/*.fdb_latexmk
-references/*.synctex.gz
-references/*.synctex.gz
-
 # Legacy experiment dumps
 data/log/
 

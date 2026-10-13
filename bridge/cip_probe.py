@@ -13,6 +13,7 @@ Env (set by mve_pln_probe.py):
   CAIRN_PLN_PROBE_WAGE=200
   CAIRN_PLN_PROBE_OUT=output/cognitive_synergy/mve_pln_probe
   CAIRN_PLN_PROBE_EXPORT_ONLY=0|1   # alias: CAIRN_PLN_PROBE_DUMP_ONLY
+  CAIRN_PLN_PROBE_MODULES=0|1       # also write cip_N.hebbian.json
 """
 
 from __future__ import annotations
@@ -83,6 +84,36 @@ def _env_float(name: str, default: float) -> float:
 
 def probe_enabled() -> bool:
     return _env_truthy("CAIRN_PLN_PROBE")
+
+
+def modules_enabled() -> bool:
+    """MeTTa gate: dump the whole Hebbian bank beside the capped probe."""
+    return _env_truthy("CAIRN_PLN_PROBE_MODULES")
+
+
+def record_hebbian(cip_index, edges) -> bool:
+    """Write cip_{i}.hebbian.json. Louvain runs later, offline.
+
+    The live PLN cell keeps reading cip_{i}.json. A dump error is printed
+    and swallowed so the closed trajectory still finishes.
+    """
+    if not modules_enabled():
+        return False
+    try:
+        i = int(float(cip_index))
+    except (TypeError, ValueError):
+        print(f"[cip_probe] hebbian skip bad cip {cip_index!r}", file=sys.stderr)
+        return False
+    try:
+        triples = export_snapshot._edge_list(edges)
+        path = probes_dir() / f"cip_{i}.hebbian.json"
+        payload = {"cip_index": i, "n_edges": len(triples), "edges": triples}
+        path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    except Exception as exc:
+        print(f"[cip_probe] cip={cip_index} hebbian dump failed: {exc}", file=sys.stderr)
+        return False
+    print(f"[cip_probe] cip={i} hebbian n_edges={len(triples)} → {path.name}")
+    return True
 
 
 def every_n() -> int:
@@ -394,6 +425,9 @@ def list_probe_snapshots(probes_root: Optional[Path] = None) -> list[tuple[int, 
         return []
     out: list[tuple[int, Path]] = []
     for p in root.glob("cip_*.json"):
+        # cip_N.hebbian.json is the full bank, not a probe snapshot.
+        if ".hebbian." in p.name or not p.stem.startswith("cip_"):
+            continue
         stem = p.stem  # cip_12
         try:
             i = int(stem.split("_", 1)[1])
@@ -585,6 +619,156 @@ def run_offline_grid(
     return 0 if n_fail == 0 else 1
 
 
+SEED_FIELDS = [
+    "cip_index",
+    "seed",
+    "query",
+    "influenced_solved",
+    "distracted_solved",
+    "influenced_beats_distracted",
+    "influenced_n_premises",
+    "distracted_n_premises",
+    "influenced_confidence",
+    "distracted_confidence",
+    "s_equals_focus",
+    "query_covered_by_s",
+    "s_overlap_focus",
+    "skip_reason",
+]
+
+
+def _sym_list(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        return [str(x) for x in value if str(x)]
+    return [str(value)]
+
+
+def _seed_row(cip_index: int, seed: int, summary: dict, skip: str) -> dict:
+    """One distracted draw on a fixed snapshot. W and I do not use the seed."""
+    params = summary.get("parameters") or {}
+    arms = summary.get("arms") or {}
+    att = summary.get("attention") or {}
+    influenced = arms.get("influenced") or {}
+    distracted = arms.get("distracted") or {}
+    focus = set(_sym_list(att.get("focus")))
+    drawn = set(_sym_list(att.get("distracted_S")))
+    query_objs = _sym_list(att.get("query_objects"))
+    if not query_objs:
+        label = str(params.get("query") or "")
+        query_objs = [p for p in label.split() if p and p != "Inheritance"]
+    covered = bool(query_objs) and all(q in drawn for q in query_objs)
+    fields = coupled.arm_fields_from_summary(summary) if summary else {}
+    return {
+        "cip_index": cip_index,
+        "seed": seed,
+        "query": params.get("query", ""),
+        "influenced_solved": _bool_cell(fields.get("influenced_solved")),
+        "distracted_solved": _bool_cell(fields.get("distracted_solved")),
+        "influenced_beats_distracted": _bool_cell(
+            fields.get("influenced_beats_distracted")
+        ),
+        "influenced_n_premises": influenced.get("n_premises", ""),
+        "distracted_n_premises": distracted.get("n_premises", ""),
+        "influenced_confidence": influenced.get("confidence", ""),
+        "distracted_confidence": distracted.get("confidence", ""),
+        "s_equals_focus": str(bool(focus) and focus == drawn),
+        "query_covered_by_s": str(covered),
+        "s_overlap_focus": len(focus & drawn),
+        "skip_reason": skip,
+    }
+
+
+def run_seed_sweep(
+    probes_root: Optional[str | Path] = None,
+    seeds: Optional[list[int]] = None,
+    focus_cap: int = coupled.DEFAULT_FOCUS_CAP,
+    budget: int = coupled.DEFAULT_BUDGET,
+    mode: str = coupled.DEFAULT_MODE,
+    out: Optional[str] = None,
+) -> int:
+    """Re-draw distracted S on saved CIP snapshots. The export stays fixed.
+
+    Each seed repeats freeze-F steering. Influenced does not depend on the
+    seed; the distracted arm does. Seed 0 is the published single-draw cell.
+    """
+    if out:
+        os.environ["CAIRN_PLN_PROBE_OUT"] = out
+    os.environ.setdefault("CAIRN_PLN_PROBE", "1")
+
+    seed_list = [int(s) for s in (seeds or [coupled.DEFAULT_SEED])]
+    k = max(2, int(focus_cap))
+    b = max(1, int(budget))
+    mode = mode if mode in ("freeze-f", "re-dynamics") else coupled.DEFAULT_MODE
+
+    root = Path(probes_root) if probes_root else probes_dir()
+    if not root.is_absolute():
+        root = CAIRN / root
+    snaps = list_probe_snapshots(root)
+    if not snaps:
+        print(f"[cip_probe] no cip_*.json under {root}", file=sys.stderr)
+        return 2
+
+    dest = out_dir()
+    dest.mkdir(parents=True, exist_ok=True)
+    total = len(snaps) * len(seed_list)
+    print(
+        f"[cip_probe] seed-sweep probes={len(snaps)} seeds={seed_list} "
+        f"k={k} B={b} mode={mode} cells={total} → {dest}"
+    )
+
+    rows: list[dict] = []
+    n_fail = 0
+    i = 0
+    for cip_i, snap_path in snaps:
+        for seed in seed_list:
+            i += 1
+            print(f"[cip_probe] seed ({i}/{total}) cip={cip_i} seed={seed}")
+            cname = coupled.midrun_cell_name(
+                "mve", cip_i, mode=mode, focus_cap=k, budget=b
+            )
+            rc = coupled.run_steering_cell(
+                str(snap_path),
+                mode=mode,
+                seed=seed,
+                budget=b,
+                focus_cap=k,
+                name=cname,
+            )
+            summary_path = CAIRN / "output" / "cognitive_synergy" / cname / "summary.json"
+            summary: dict = {}
+            skip = ""
+            if summary_path.is_file():
+                with open(summary_path, encoding="utf-8") as f:
+                    summary = json.load(f)
+            else:
+                skip = f"worker_rc={rc}_no_summary"
+            if rc and not skip:
+                skip = f"worker_rc={rc}"
+            row = _seed_row(cip_i, seed, summary, skip)
+            rows.append(row)
+            if skip:
+                n_fail += 1
+                print(f"  skip {skip}")
+            else:
+                print(
+                    f"  I={row['influenced_solved']} nI={row['influenced_n_premises']} "
+                    f"D={row['distracted_solved']} nD={row['distracted_n_premises']} "
+                    f"cover={row['query_covered_by_s']} eqF={row['s_equals_focus']} "
+                    f"overlap={row['s_overlap_focus']}"
+                )
+
+    csv_path = dest / "seed_sweep.csv"
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=SEED_FIELDS)
+        w.writeheader()
+        for row in rows:
+            w.writerow({key: row.get(key, "") for key in SEED_FIELDS})
+    print(f"[cip_probe] wrote {csv_path}")
+    return 0 if n_fail == 0 else 1
+
+
 def main(argv: Optional[list] = None) -> int:
     """CLI: single snapshot cell, or offline k×B grid over probes/."""
     import argparse
@@ -619,6 +803,21 @@ def main(argv: Optional[list] = None) -> int:
     ap.add_argument("--mode", choices=("freeze-f", "re-dynamics"), default="freeze-f")
     ap.add_argument("--seed", type=int, default=coupled.DEFAULT_SEED)
     ap.add_argument(
+        "--seeds",
+        default=None,
+        help="comma list of distracted-arm seeds; sweeps saved snapshots",
+    )
+    ap.add_argument(
+        "--premise-ranks",
+        default=None,
+        help="comma list of premise-rank widths inside C_Q and F; sweeps saved snapshots",
+    )
+    ap.add_argument(
+        "--community-aperture",
+        action="store_true",
+        help="cut C_Q and F by the whole-bank Louvain sidecar; sweeps saved snapshots",
+    )
+    ap.add_argument(
         "--out",
         default=None,
         help="protocol out dir (default output/cognitive_synergy/mve_pln_probe)",
@@ -627,6 +826,55 @@ def main(argv: Optional[list] = None) -> int:
 
     if args.out:
         os.environ["CAIRN_PLN_PROBE_OUT"] = args.out
+
+    if args.seeds:
+        k = coupled.resolve_axis(
+            args.focus_cap, args.focus_caps, coupled.DEFAULT_FOCUS_CAP
+        )[0]
+        b = coupled.resolve_axis(
+            args.budget, args.budgets, coupled.DEFAULT_BUDGET
+        )[0]
+        return run_seed_sweep(
+            probes_root=args.probes_dir,
+            seeds=coupled.parse_int_list(args.seeds, [coupled.DEFAULT_SEED]),
+            focus_cap=k,
+            budget=b,
+            mode=args.mode,
+            out=args.out,
+        )
+
+    if args.premise_ranks:
+        import premise_rank
+
+        k = coupled.resolve_axis(
+            args.focus_cap, args.focus_caps, coupled.DEFAULT_FOCUS_CAP
+        )[0]
+        b = coupled.resolve_axis(
+            args.budget, args.budgets, coupled.DEFAULT_BUDGET
+        )[0]
+        return premise_rank.run_premise_rank_sweep(
+            probes_root=args.probes_dir,
+            ranks=coupled.parse_int_list(args.premise_ranks, premise_rank.DEFAULT_RANKS),
+            focus_cap=k,
+            budget=b,
+            out=args.out,
+        )
+
+    if args.community_aperture:
+        import community_aperture
+
+        k = coupled.resolve_axis(
+            args.focus_cap, args.focus_caps, coupled.DEFAULT_FOCUS_CAP
+        )[0]
+        b = coupled.resolve_axis(
+            args.budget, args.budgets, coupled.DEFAULT_BUDGET
+        )[0]
+        return community_aperture.run_community_sweep(
+            probes_root=args.probes_dir,
+            focus_cap=k,
+            budget=b,
+            out=args.out,
+        )
 
     if args.offline_grid:
         return run_offline_grid(

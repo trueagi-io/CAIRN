@@ -85,6 +85,7 @@ def run_mve_with_probes(
     closed_loop: bool = False,
     wage: float = 200.0,
     export_only: bool = False,
+    modules: bool = False,
     out: str = "output/cognitive_synergy/mve_pln_probe",
 ) -> int:
     if not MVE.is_file():
@@ -102,6 +103,7 @@ def run_mve_with_probes(
     # Shared name with B2; DUMP_ONLY kept as env alias for older injects
     env["CAIRN_PLN_PROBE_EXPORT_ONLY"] = "1" if export_only else "0"
     env["CAIRN_PLN_PROBE_DUMP_ONLY"] = "1" if export_only else "0"
+    env["CAIRN_PLN_PROBE_MODULES"] = "1" if modules else "0"
     if "CAIRN_BRIDGE_TIMEOUT" not in env:
         env["CAIRN_BRIDGE_TIMEOUT"] = "180"
 
@@ -113,7 +115,7 @@ def run_mve_with_probes(
         tmp_path.write_text(body, encoding="utf-8")
         print(
             f"[mve_pln_probe] mve + probes every={every} k={focus_cap} B={budget} "
-            f"closed_loop={closed_loop} export_only={export_only}"
+            f"closed_loop={closed_loop} export_only={export_only} modules={modules}"
         )
         r = subprocess.run(
             ["bash", str(PETTA), tmp_path.name],
@@ -181,6 +183,11 @@ def main() -> int:
         help="export AF snapshots only (no PLN); same idea as B2 --export-only",
     )
     ap.add_argument(
+        "--modules",
+        action="store_true",
+        help="at each probed CIP, also write the whole Hebbian bank as cip_N.hebbian.json",
+    )
+    ap.add_argument(
         "--dump-only",
         action="store_true",
         help=argparse.SUPPRESS,  # alias for --export-only
@@ -203,6 +210,11 @@ def main() -> int:
     )
     ap.add_argument("--seed", type=int, default=coupled.DEFAULT_SEED)
     ap.add_argument(
+        "--seeds",
+        default=None,
+        help="offline: comma list of distracted seeds on saved CIP snapshots",
+    )
+    ap.add_argument(
         "--out",
         default="output/cognitive_synergy/mve_pln_probe",
         help="protocol output directory",
@@ -219,6 +231,26 @@ def main() -> int:
         os.environ["CAIRN_BRIDGE_TIMEOUT"] = str(args.timeout)
     elif args.timeout == 0:
         os.environ["CAIRN_BRIDGE_TIMEOUT"] = "0"
+
+    if args.seeds:
+        if args.closed_loop:
+            print(
+                "[mve_pln_probe] --seeds re-draws S on a saved export; "
+                "it does not re-run the live wage",
+                file=sys.stderr,
+            )
+        return cip_probe.run_seed_sweep(
+            probes_root=args.probes_dir,
+            seeds=coupled.parse_int_list(args.seeds, [coupled.DEFAULT_SEED]),
+            focus_cap=coupled.resolve_axis(
+                args.focus_cap, args.focus_caps, coupled.DEFAULT_FOCUS_CAP
+            )[0],
+            budget=coupled.resolve_axis(
+                args.budget, args.budgets, coupled.DEFAULT_BUDGET
+            )[0],
+            mode=args.mode,
+            out=args.out,
+        )
 
     if args.offline_grid:
         if args.closed_loop:
@@ -250,6 +282,7 @@ def main() -> int:
         closed_loop=args.closed_loop,
         wage=args.wage,
         export_only=bool(args.export_only or args.dump_only),
+        modules=args.modules,
         out=args.out,
     )
 

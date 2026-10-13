@@ -124,7 +124,6 @@ Inventory: `python tools/write_output_index.py` → `output/index.json`.
 - **`tools/`** – CIP helpers; `bridge_export.metta` loaded only by mve_bridge tail
 - **`data/`** – Sentence corpora (`.sent`), ECAN parameter presets
 - **`dev-tests/`** – Unit tests for CAIRN internals
-- **`references/main.tex`** – Formula and pseudocode specs
 
 ## Architecture
 

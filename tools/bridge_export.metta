@@ -28,6 +28,15 @@
 (= (bridge-export-edges)
    (union-atom (bridge-export-edges-from-af) (bridge-export-edges-to-af)))
 
+; Whole Hebbian bank, not the AF-incident cap. The community partition is
+; Louvain on this list. The capped snapshot the PLN cell reads stays separate.
+; Bind the scan before superpose: PeTTa otherwise treats get-all-hlinks as a symbol.
+(= (bridge-export-hebbian-edges)
+   (let $links (get-all-hlinks)
+        (collapse
+           (let $link (superpose $links)
+                (bridge-hlink-edge $link)))))
+
 (= (bridge-sti-of $a)
    (let $r (collapse (getSti $a))
         (if (== $r ()) 0.0 (* 1.0 (car-atom $r)))))
