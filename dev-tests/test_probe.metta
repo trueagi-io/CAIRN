@@ -27,8 +27,8 @@
 
 (= (abs-val $x) (if (< $x 0.0) (- 0.0 $x) $x))
 
-; ---- identify-modules round-trip (py-call list-of-atoms risk) --
-; Two disjoint triangles -> 2 modules, atom identity preserved.
+; ---- identify-communities round-trip (py-call list-of-atoms risk) --
+; Two disjoint triangles -> 2 communities, atom identity preserved.
 
 !(bind! &typeSpace (new-space))
 !(add-atom &typeSpace ((ASYMMETRIC_HEBBIAN_LINK a b) stub))
@@ -40,13 +40,13 @@
 
 (= (getMean $link) 0.5)
 
-!(let $modules (identify-modules (get-all-hlinks))
-   (assert-eq identify-modules-two-triangles 2 (size-atom $modules)))
+!(let $communities (identify-communities (get-all-hlinks))
+   (assert-eq identify-communities-two-triangles 2 (size-atom $communities)))
 
-; Atom 'a' must structurally match inside whichever module contains it.
-!(let $modules (identify-modules (get-all-hlinks))
-   (let $idx (module-index-of a $modules 0)
-      (assert-eq identify-modules-atom-roundtrip True (>= $idx 0))))
+; Atom 'a' must structurally match inside whichever community contains it.
+!(let $communities (identify-communities (get-all-hlinks))
+   (let $idx (community-index-of a $communities 0)
+      (assert-eq identify-communities-atom-roundtrip True (>= $idx 0))))
 
 ; ---- measure-cognitive-maintenance ------------------------------
 ; AF sets: (a b c) -> (a b d) -> (a b d e)

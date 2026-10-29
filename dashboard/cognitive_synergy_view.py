@@ -529,9 +529,10 @@ def _compact_probe_table(df: pd.DataFrame) -> pd.DataFrame:
             out[col] = out[col].map(_bool_letter)
 
     if "query" in out.columns:
-        out["query"] = out["query"].astype(str).str.replace(
-            "Inheritance ", "", regex=False
-        )
+        text = out["query"].astype(str)
+        for name in ("Inheritance ", "Implication ", "Similarity "):
+            text = text.str.replace(name, "", regex=False)
+        out["query"] = text
 
     keep = [
         c

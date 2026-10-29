@@ -42,6 +42,7 @@ _EXPORT_TAIL = """
 
 sys.path.insert(0, str(CAIRN / "bridge"))
 import coupled  # noqa: E402
+import pln_encoding  # noqa: E402
 import run_bridge  # noqa: E402
 
 
@@ -103,6 +104,7 @@ def run(
     seed: Optional[int] = None,
     feedback: bool = False,
     snapshot: Optional[str] = None,
+    encoder: Optional[str] = None,
 ) -> int:
     """Programmatic entry.
 
@@ -113,6 +115,8 @@ def run(
     snap_path = Path(snapshot) if snapshot else SNAP
     if not snap_path.is_absolute():
         snap_path = CAIRN / snap_path
+    if encoder:
+        os.environ["CAIRN_PLN_ENCODER"] = pln_encoding.normalize(encoder)
 
     if export_only:
         return run_mve_with_export()
@@ -148,6 +152,7 @@ def run(
         focus_caps=k_list,
         seed=seed,
         with_feedback=feedback,
+        link=encoder,
     )
 
 
@@ -208,6 +213,12 @@ def main(argv: Optional[list] = None) -> int:
         action="store_true",
         help=argparse.SUPPRESS,
     )
+    ap.add_argument(
+        "--encoder",
+        choices=pln_encoding.LINK_TYPES,
+        default=None,
+        help="binary PLN form for Hebbian edges (default Inheritance)",
+    )
     args = ap.parse_args(argv)
 
     if args.export_only and (args.offline_grid or args.skip_mve):
@@ -241,6 +252,7 @@ def main(argv: Optional[list] = None) -> int:
         seed=args.seed,
         feedback=args.feedback,
         snapshot=args.snapshot,
+        encoder=args.encoder,
     )
 
 

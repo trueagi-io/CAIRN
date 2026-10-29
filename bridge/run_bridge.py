@@ -263,6 +263,8 @@ def run_from_snapshot(
     budget: int = 10,
     focus_cap: Optional[int] = None,
     name: Optional[str] = None,
+    focus_atoms: Optional[list] = None,
+    link: Optional[str] = None,
 ) -> int:
     """Generate scenario from snapshot JSON and run bridge protocol.
 
@@ -291,6 +293,8 @@ def run_from_snapshot(
             budget=budget,
             name=name,
             protocol=proto,
+            focus_atoms=focus_atoms,
+            link=link,
         )
     except ValueError as e:
         print(f"[run_bridge] skip: {e}", file=sys.stderr)
@@ -302,7 +306,8 @@ def run_from_snapshot(
     print(
         f"[run_bridge] from-snapshot mode={mode} protocol={proto} "
         f"focus={meta.get('n_focus')}/{meta.get('n_af_export')} "
-        f"tables={meta.get('n_tables')} k={meta.get('focus_cap')} B={budget} → {fname}"
+        f"tables={meta.get('n_tables')} encoder={meta.get('link')} "
+        f"k={meta.get('focus_cap')} B={budget} → {fname}"
     )
     return _run_once(
         map_rel, pln_rel, proto, fname, pre, seed=seed, budget=budget
@@ -467,6 +472,7 @@ def run_coupled_grid(
     focus_caps: Optional[list[int]] = None,
     seed: Optional[int] = None,
     with_feedback: bool = False,
+    link: Optional[str] = None,
 ) -> int:
     """B2 coupled suite: modes × focus_cap × budget on one snapshot.
 
@@ -521,6 +527,7 @@ def run_coupled_grid(
                     budget=b,
                     focus_cap=k,
                     name=cname,
+                    link=link,
                 )
                 summary = CAIRN / "output" / "cognitive_synergy" / cname / "summary.json"
                 row = _cell_row(summary, m, k, b)
@@ -541,6 +548,7 @@ def run_coupled_grid(
                         protocol="feedback",
                         budget=b,
                         focus_cap=k,
+                        link=link,
                     )
                     if rc_fb:
                         _write_coupled_table(
@@ -698,6 +706,12 @@ def main():
         action="store_true",
         help="coupled: after each steering cell, also run feedback protocol",
     )
+    ap.add_argument(
+        "--encoder",
+        choices=("Inheritance", "Implication", "Similarity"),
+        default=None,
+        help="binary PLN form for Hebbian edges (default Inheritance)",
+    )
     args = ap.parse_args()
     cmd = args.cmd
 
@@ -723,7 +737,8 @@ def main():
         print("Usage (coupled B2):")
         print(
             "  python bridge/run_bridge.py from-snapshot PATH "
-            "[--modes …] [--budgets …] [--focus-caps …] [--feedback] [--seed K]"
+            "[--modes …] [--budgets …] [--focus-caps …] [--feedback] [--seed K] "
+            "[--encoder Inheritance|Implication|Similarity]"
         )
         print(
             "  python bridge/run_bridge.py ablate PATH   # multi-mode wide offline grid"
@@ -783,6 +798,7 @@ def main():
                 protocol="feedback",
                 budget=b_list[0],
                 focus_cap=k_list[0],
+                link=args.encoder,
             )
         return run_coupled_grid(
             args.snapshot,
@@ -791,6 +807,7 @@ def main():
             focus_caps=k_list,
             seed=args.seed,
             with_feedback=args.feedback,
+            link=args.encoder,
         )
     if cmd == "ablate":
         # Back-compat: multi-mode wide defaults
@@ -822,6 +839,7 @@ def main():
             focus_caps=k_list,
             seed=args.seed,
             with_feedback=args.feedback,
+            link=args.encoder,
         )
     print(f"unknown command: {cmd}", file=sys.stderr)
     return 2

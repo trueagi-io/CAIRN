@@ -11,10 +11,17 @@ Does not import PeTTa; pure Python JSON writer.
 from __future__ import annotations
 
 import json
+import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional, Union
+
+_BRIDGE = Path(__file__).resolve().parent
+if str(_BRIDGE) not in sys.path:
+    sys.path.insert(0, str(_BRIDGE))
+
+import pln_encoding  # noqa: E402
 
 DEFAULT_MAX_NODES = 80
 DEFAULT_MAX_EDGES = 200
@@ -115,13 +122,21 @@ def _grow_nodes(af, edges, sti, max_nodes: int) -> list:
     return chosen
 
 
-def _pick_query(nodes: list, edges: list, sti: dict, explicit=None) -> dict:
+def _query_record(link: str, objs: list) -> dict:
+    kind = pln_encoding.normalize(link)
+    return {
+        "objects": objs,
+        "link": kind,
+        "term": [kind, objs[0], objs[1]],
+        "term_label": pln_encoding.label(kind, objs[0], objs[1]),
+    }
+
+
+def _pick_query(nodes: list, edges: list, sti: dict, explicit=None, link=None) -> dict:
+    kind = pln_encoding.normalize(link) if link else pln_encoding.from_env()
     if explicit and len(_as_list(explicit)) >= 2:
         objs = [_atom(x) for x in _as_list(explicit)[:2]]
-        return {
-            "objects": objs,
-            "term_label": f"Inheritance {objs[0]} {objs[1]}",
-        }
+        return _query_record(kind, objs)
 
     # undirected adjacency for path check
     adj = defaultdict(set)
@@ -151,16 +166,13 @@ def _pick_query(nodes: list, edges: list, sti: dict, explicit=None) -> dict:
     for i, a in enumerate(ranked):
         for b in ranked[i + 1 :]:
             if reachable(a, b):
-                return {
-                    "objects": [a, b],
-                    "term_label": f"Inheritance {a} {b}",
-                }
+                return _query_record(kind, [a, b])
     # fallback top-2 STI even if disconnected
     objs = ranked[:2] if len(ranked) >= 2 else ranked + ranked
     objs = objs[:2]
     if len(objs) < 2:
         objs = (objs + ["_pad", "_pad"])[:2]
-    return {"objects": objs, "term_label": f"Inheritance {objs[0]} {objs[1]}"}
+    return _query_record(kind, objs)
 
 
 def build_snapshot(
@@ -171,6 +183,7 @@ def build_snapshot(
     max_nodes: int = 80,
     max_edges: int = 200,
     query_objects=None,
+    link=None,
 ) -> dict:
     sti = _sti_map(sti_pairs)
     raw_edges = _edge_list(edges)
@@ -201,10 +214,12 @@ def build_snapshot(
     if not af_out:
         af_out = nodes[: min(10, len(nodes))]
 
-    query = _pick_query(nodes, kept_edges, sti, explicit=query_objects)
+    kind = pln_encoding.normalize(link) if link else pln_encoding.from_env()
+    query = _pick_query(nodes, kept_edges, sti, explicit=query_objects, link=kind)
 
     return {
         "source": str(source),
+        "link": kind,
         "exported_at": datetime.now().isoformat(),
         "af": af_out,
         "sti": {n: sti.get(n, 0.0) for n in nodes},
@@ -266,6 +281,7 @@ def write_attention_snapshot(
     max_nodes=DEFAULT_MAX_NODES,
     max_edges=DEFAULT_MAX_EDGES,
     query_objects=None,
+    link=None,
 ):
     """Canonical AF→JSON export for B2 (end) and B3 (midrun).
 
@@ -289,6 +305,7 @@ def write_attention_snapshot(
         max_nodes=int(float(max_nodes)),
         max_edges=int(float(max_edges)),
         query_objects=query_objects,
+        link=link,
     )
     snap["schedule"] = sched
     snap["source"] = str(source)
@@ -315,6 +332,7 @@ def write(
     max_nodes=DEFAULT_MAX_NODES,
     max_edges=DEFAULT_MAX_EDGES,
     query_objects=None,
+    link=None,
 ):
     """Back-compat thin wrapper → write_attention_snapshot (schedule=end)."""
     return write_attention_snapshot(
@@ -328,6 +346,7 @@ def write(
         max_nodes,
         max_edges,
         query_objects,
+        link,
     )
 
 
@@ -340,6 +359,7 @@ def write_midrun(
     probes_dir=DEFAULT_PROBES_DIR,
     max_nodes=DEFAULT_MAX_NODES,
     max_edges=DEFAULT_MAX_EDGES,
+    link=None,
 ):
     """B3 convenience: write probes/cip_{i}.json with schedule=midrun."""
     ci = _norm_cip_index(cip_index)
@@ -357,5 +377,6 @@ def write_midrun(
         max_nodes,
         max_edges,
         None,
+        link,
     )
 

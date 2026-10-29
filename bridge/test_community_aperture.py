@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 import community_aperture as ca
-from utils import identify_modules
+from utils import identify_communities
 
 
 def _row(stamp, src, tgt):
@@ -93,9 +93,9 @@ class LabelTests(unittest.TestCase):
             ("y", "z", 0.5),
             ("x", "z", 0.5),
         ]
-        modules = identify_modules(edges)
-        self.assertEqual(len(modules), 2)
-        membership = ca.membership_from_modules(modules)
+        communities = identify_communities(edges)
+        self.assertEqual(len(communities), 2)
+        membership = ca.membership_from_communities(communities)
         self.assertEqual(membership["a"], membership["b"])
         self.assertNotEqual(membership["a"], membership["x"])
         query = ["a", "b"]

@@ -40,7 +40,8 @@
         done))
 
 ; Auto incident graph from table legs (undirected). Entry = (node (n1 n2 ...)).
-(= (table-edge (Table $_ Inheritance $legs $_ $_))
+; The predicate is the binary encoder: Inheritance, Implication, or Similarity.
+(= (table-edge (Table $_ $_ $legs $_ $_))
    ((car-atom $legs) (car-atom (cdr-atom $legs))))
 (= (tables-edges () ) ())
 (= (tables-edges (cons $t $rest))

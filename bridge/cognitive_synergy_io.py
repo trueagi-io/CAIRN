@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import random
 import time
 from collections import defaultdict
@@ -61,6 +62,15 @@ _ARM_KEYS = {
 }
 
 
+def link_influenced_only():
+    """Live priced link: the cell queries the influenced arm and leaves the other two."""
+    return os.environ.get("CAIRN_LINK_INFLUENCED_ONLY", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
 def wall_ms():
     """Monotonic wall clock in milliseconds (for MeTTa py-call timers)."""
     return time.perf_counter() * 1000.0
@@ -93,7 +103,7 @@ def _edge_pair(item):
     if not isinstance(item, (list, tuple)) or len(item) < 2:
         return None
     a, b = item[0], item[1]
-    if str(a) in ("Table", "Inheritance"):
+    if str(a) in ("Table", "Inheritance", "Implication", "Similarity"):
         return None
     return str(a), str(b)
 

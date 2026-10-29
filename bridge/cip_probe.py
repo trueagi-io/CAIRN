@@ -13,7 +13,11 @@ Env (set by mve_pln_probe.py):
   CAIRN_PLN_PROBE_WAGE=200
   CAIRN_PLN_PROBE_OUT=output/cognitive_synergy/mve_pln_probe
   CAIRN_PLN_PROBE_EXPORT_ONLY=0|1   # alias: CAIRN_PLN_PROBE_DUMP_ONLY
-  CAIRN_PLN_PROBE_MODULES=0|1       # also write cip_N.hebbian.json
+  CAIRN_PLN_PROBE_COMMUNITIES=0|1  # also write cip_N.hebbian.json
+  CAIRN_PLN_PROBE_LINK=0|1          # priced link; probes live under CAIRN_PLN_PROBE_OUT
+  CAIRN_PLN_ENCODER=Inheritance|Implication|Similarity  # binary form of a Hebbian edge
+  CAIRN_LINK_ADMIT_FREE=0|1         # open pass admits the tail after the fund suspends
+  CAIRN_LINK_INFLUENCED_ONLY=0|1    # unused; weighted and distracted stay on the cell
 """
 
 from __future__ import annotations
@@ -34,6 +38,8 @@ sys.path.insert(0, str(BRIDGE))
 
 import coupled  # noqa: E402
 import export_snapshot  # noqa: E402
+import link_fund  # noqa: E402
+import pln_encoding  # noqa: E402
 
 PROBE_FIELDS = [
     "cip_index",
@@ -86,9 +92,9 @@ def probe_enabled() -> bool:
     return _env_truthy("CAIRN_PLN_PROBE")
 
 
-def modules_enabled() -> bool:
+def communities_enabled() -> bool:
     """MeTTa gate: dump the whole Hebbian bank beside the capped probe."""
-    return _env_truthy("CAIRN_PLN_PROBE_MODULES")
+    return _env_truthy("CAIRN_PLN_PROBE_COMMUNITIES")
 
 
 def record_hebbian(cip_index, edges) -> bool:
@@ -97,7 +103,7 @@ def record_hebbian(cip_index, edges) -> bool:
     The live PLN cell keeps reading cip_{i}.json. A dump error is printed
     and swallowed so the closed trajectory still finishes.
     """
-    if not modules_enabled():
+    if not communities_enabled():
         return False
     try:
         i = int(float(cip_index))
@@ -132,6 +138,25 @@ def closed_loop() -> bool:
     return _env_truthy("CAIRN_PLN_PROBE_CLOSED_LOOP")
 
 
+def link_enabled() -> bool:
+    return _env_truthy("CAIRN_PLN_PROBE_LINK")
+
+
+def admit_free() -> bool:
+    """Open pass: an exhausted link admits the remaining matches for free."""
+    return _env_truthy("CAIRN_LINK_ADMIT_FREE")
+
+
+def release_mode() -> str | None:
+    raw = os.environ.get("CAIRN_LINK_RELEASE", "").strip().lower()
+    if not raw:
+        return None
+    if raw not in link_fund.RELEASE_MODES:
+        print(f"[cip_probe] ignoring unknown release mode {raw!r}", file=sys.stderr)
+        return None
+    return raw
+
+
 def wage_amount() -> float:
     return _env_float("CAIRN_PLN_PROBE_WAGE", 200.0)
 
@@ -157,15 +182,26 @@ def out_dir() -> Path:
 
 
 def probes_dir() -> Path:
-    p = CAIRN / "output" / "mve" / "probes"
+    # Link passes keep their own probes. The shared mve dir is the B4 export.
+    p = (out_dir() / "probes") if link_enabled() else (CAIRN / "output" / "mve" / "probes")
     p.mkdir(parents=True, exist_ok=True)
     return p
 
 
 def wage_dir() -> Path:
-    p = CAIRN / "output" / "mve" / "wage"
+    p = (out_dir() / "wage") if link_enabled() else (CAIRN / "output" / "mve" / "wage")
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def fund_path() -> Path:
+    return out_dir() / "fund.json"
+
+
+def probe_fields() -> list[str]:
+    if link_enabled():
+        return PROBE_FIELDS + link_fund.LINK_FIELDS
+    return list(PROBE_FIELDS)
 
 
 def should_probe(cip_index) -> bool:
@@ -189,10 +225,11 @@ def _append_probe_row(row: dict) -> None:
     path = out_dir() / "protocol_probes.csv"
     write_header = not path.exists()
     with open(path, "a", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=PROBE_FIELDS)
+        fields = probe_fields()
+        w = csv.DictWriter(f, fieldnames=fields)
         if write_header:
             w.writeheader()
-        w.writerow({k: row.get(k, "") for k in PROBE_FIELDS})
+        w.writerow({k: row.get(k, "") for k in fields})
 
 
 def _bool_cell(v) -> str:
@@ -258,32 +295,72 @@ def run_probe(cip_index, af, sti_pairs, edges) -> Any:
             print(f"[cip_probe] cip={i} export-only → {row['snapshot_path']}")
             return []
 
-        # Same kernel as B2: freeze-f three-arm cell with stable k/B name
+        # Same kernel as B2: freeze-f cell with stable k/B name.
+        # The priced link queries the influenced arm on the atoms it held.
+        held: list[str] | None = None
+        account: dict | None = None
+        if link_enabled():
+            query = [str(x) for x in ((snap.get("query") or {}).get("objects") or [])]
+            ordered = link_fund.order_candidates(snap.get("af") or [], query, snap.get("sti") or {})
+            doc = link_fund.load_fund(fund_path())
+            if doc is None or doc.get("remainder") is None:
+                opening = link_fund.focus_mass(snap.get("af") or [], snap.get("sti") or {})
+                owned: list[str] = []
+            else:
+                opening = float(doc["remainder"])
+                owned = [str(atom) for atom in (doc.get("owned") or [])]
+            present = link_fund.importable_bank(snap)
+            for atom in query:
+                if atom not in present:
+                    present.append(atom)
+            account = link_fund.price_link(
+                ordered,
+                snap.get("sti") or {},
+                opening,
+                k,
+                admit_free(),
+                owned=owned,
+                release=release_mode(),
+                query=query,
+                present=present,
+            )
+            held = list(account["held"])
+            print(
+                f"[cip_probe] cip={i} link open={opening:.4g} held={account['n_held']} "
+                f"kept={account['n_retained']} bought={account['n_bought']} "
+                f"released={account['n_released']} free={account['n_free']} "
+                f"bound={account['bound']} suspended={account['suspended']}"
+            )
+
         cname = coupled.midrun_cell_name(
             "mve", i, mode=coupled.DEFAULT_MODE, focus_cap=k, budget=b
         )
         cell_out = out_dir() / "cells" / f"cip_{i}"
         cell_out.mkdir(parents=True, exist_ok=True)
 
-        rc = coupled.run_steering_cell(
-            path,
-            mode=coupled.DEFAULT_MODE,
-            seed=coupled.DEFAULT_SEED,
-            budget=b,
-            focus_cap=k,
-            name=cname,
-        )
-
-        src_summary = CAIRN / "output" / "cognitive_synergy" / cname / "summary.json"
-        dst_summary = cell_out / "summary.json"
-        if src_summary.is_file():
-            shutil.copy2(src_summary, dst_summary)
-            row["summary_path"] = str(dst_summary.relative_to(CAIRN))
-            with open(src_summary, encoding="utf-8") as f:
-                summary = json.load(f)
+        summary: dict = {}
+        if account is not None and account["forgotten"]:
+            row["influenced_solved"] = "false"
+            row["influenced_n_premises"] = 0
         else:
-            summary = {}
-            row["skip_reason"] = f"worker_rc={rc}_no_summary"
+            rc = coupled.run_steering_cell(
+                path,
+                mode=coupled.DEFAULT_MODE,
+                seed=coupled.DEFAULT_SEED,
+                budget=b,
+                focus_cap=k,
+                name=cname,
+                focus_atoms=held,
+            )
+            src_summary = CAIRN / "output" / "cognitive_synergy" / cname / "summary.json"
+            dst_summary = cell_out / "summary.json"
+            if src_summary.is_file():
+                shutil.copy2(src_summary, dst_summary)
+                row["summary_path"] = str(dst_summary.relative_to(CAIRN))
+                with open(src_summary, encoding="utf-8") as f:
+                    summary = json.load(f)
+            else:
+                row["skip_reason"] = f"worker_rc={rc}_no_summary"
 
         fields = coupled.arm_fields_from_summary(summary)
         row.update(
@@ -308,6 +385,15 @@ def run_probe(cip_index, af, sti_pairs, edges) -> Any:
                 "query": fields.get("query", ""),
             }
         )
+        if link_enabled():
+            arms = summary.get("arms") or {}
+            for arm_name in ("weighted", "influenced", "distracted"):
+                row[f"{arm_name}_confidence"] = coupled.arm_dict(arms, arm_name).get(
+                    "confidence", ""
+                )
+        if account is not None and account["forgotten"]:
+            row["influenced_solved"] = "false"
+            row["influenced_n_premises"] = 0
 
         wage_atoms: list[str] = []
         wage_meta: dict = {}
@@ -334,6 +420,22 @@ def run_probe(cip_index, af, sti_pairs, edges) -> Any:
             row["wage_applied"] = bool(wage_atoms)
             row["wage_method"] = wage_meta.get("method", "")
 
+        if account is not None:
+            added = link_fund.wage_credit(len(wage_atoms), wage_amount()) if wage_atoms else 0.0
+            _record_link_period(i, account, added, bool(wage_atoms))
+            row["credit_open"] = account["credit_open"]
+            row["spent"] = account["spent"]
+            row["remainder"] = account["remainder"]
+            row["n_held"] = account["n_held"]
+            row["bound"] = account["bound"]
+            row["suspended"] = _bool_cell(account["suspended"])
+            row["forgotten"] = _bool_cell(account["forgotten"])
+            row["n_free"] = account["n_free"]
+            row["n_retained"] = account["n_retained"]
+            row["n_bought"] = account["n_bought"]
+            row["n_released"] = account["n_released"]
+            row["wage_credit"] = added
+
         row["wall_ms"] = int((time.time() - t0) * 1000)
         _append_probe_row(row)
         print(
@@ -355,6 +457,48 @@ def run_probe(cip_index, af, sti_pairs, edges) -> Any:
             pass
         print(f"[cip_probe] cip={i} ERROR {e}", file=sys.stderr)
         return []
+
+
+def _record_link_period(cip_index: int, account: dict, added: float, paid: bool) -> None:
+    """Carry the remainder, including the wage credit, into the next period."""
+    path = fund_path()
+    doc = link_fund.load_fund(path) or link_fund.fresh_fund(
+        admit_free(), wage_amount(), focus_cap()
+    )
+    period = {
+        "cip_index": cip_index,
+        "credit_open": account["credit_open"],
+        "spent": account["spent"],
+        "remainder": account["remainder"],
+        "held": account["held"],
+        "n_held": account["n_held"],
+        "bound": account["bound"],
+        "suspended": account["suspended"],
+        "forgotten": account["forgotten"],
+        "n_free": account["n_free"],
+        "n_retained": account["n_retained"],
+        "n_bought": account["n_bought"],
+        "n_released": account["n_released"],
+        "released": account["released"],
+        "owned": account["owned"],
+        "wage_credit": added,
+        "wage_applied": paid,
+    }
+    periods = [
+        item
+        for item in (doc.get("periods") or [])
+        if int(item.get("cip_index", -1)) != cip_index
+    ]
+    periods.append(period)
+    periods.sort(key=lambda item: int(item["cip_index"]))
+    doc["periods"] = periods
+    doc["remainder"] = float(account["remainder"]) + float(added)
+    doc["owned"] = list(account["owned"])
+    doc["release"] = release_mode() or ""
+    doc["admit_free"] = admit_free()
+    doc["wage"] = wage_amount()
+    doc["k"] = focus_cap()
+    link_fund.save_fund(path, doc)
 
 
 def _true_cell(row: dict, *keys) -> bool:
@@ -445,6 +589,7 @@ def _run_offline_cell(
     budget_b: int,
     seed: int,
     mode: str,
+    link: str | None = None,
 ) -> dict:
     """One offline workshop cell; return protocol_probes row."""
     t0 = time.time()
@@ -490,6 +635,7 @@ def _run_offline_cell(
         seed=seed,
         budget=budget_b,
         focus_cap=focus_cap_k,
+        link=link,
         name=cname,
     )
     src_summary = CAIRN / "output" / "cognitive_synergy" / cname / "summary.json"
@@ -539,6 +685,7 @@ def run_offline_grid(
     seed: int = coupled.DEFAULT_SEED,
     mode: str = coupled.DEFAULT_MODE,
     out: Optional[str] = None,
+    link: str | None = None,
 ) -> int:
     """B3 offline: k×B grid on saved probe snapshots (after --export-only).
 
@@ -576,7 +723,7 @@ def run_offline_grid(
                 print(
                     f"[cip_probe] offline ({i}/{total}) cip={cip_i} k={k} B={b}"
                 )
-                row = _run_offline_cell(snap_path, cip_i, k, b, seed, mode)
+                row = _run_offline_cell(snap_path, cip_i, k, b, seed, mode, link)
                 rows.append(row)
                 if row.get("skip_reason"):
                     n_fail += 1
@@ -657,7 +804,7 @@ def _seed_row(cip_index: int, seed: int, summary: dict, skip: str) -> dict:
     query_objs = _sym_list(att.get("query_objects"))
     if not query_objs:
         label = str(params.get("query") or "")
-        query_objs = [p for p in label.split() if p and p != "Inheritance"]
+        query_objs = pln_encoding.objects_from_label(label)
     covered = bool(query_objs) and all(q in drawn for q in query_objs)
     fields = coupled.arm_fields_from_summary(summary) if summary else {}
     return {
@@ -687,6 +834,7 @@ def run_seed_sweep(
     budget: int = coupled.DEFAULT_BUDGET,
     mode: str = coupled.DEFAULT_MODE,
     out: Optional[str] = None,
+    link: str | None = None,
 ) -> int:
     """Re-draw distracted S on saved CIP snapshots. The export stays fixed.
 
@@ -735,6 +883,7 @@ def run_seed_sweep(
                 budget=b,
                 focus_cap=k,
                 name=cname,
+                link=link,
             )
             summary_path = CAIRN / "output" / "cognitive_synergy" / cname / "summary.json"
             summary: dict = {}

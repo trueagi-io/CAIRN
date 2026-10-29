@@ -3,7 +3,7 @@
 
 The live closed loop still admits the unranked filter. This sweep reads the
 capped probe plus the sibling cip_N.hebbian.json recorded on that pass,
-partitions the full bank with utils.identify_modules (resolution 1.01,
+partitions the full bank with utils.identify_communities (resolution 1.01,
 seed 42), and queries three apertures: the full filter, the intra-community
 premises, and the inter-community premises. The first high-STI band is
 queried once and labeled by the same cut.
@@ -29,7 +29,7 @@ sys.path.insert(0, str(BRIDGE))
 sys.path.insert(0, str(TOOLS))
 
 import premise_rank  # noqa: E402
-from utils import identify_modules  # noqa: E402
+from utils import identify_communities  # noqa: E402
 
 SIDES = ("intra", "inter", "bridge", "unassigned")
 ARM_ORDER = ("full", "intra", "inter", "band")
@@ -37,12 +37,12 @@ ARM_ORDER = ("full", "intra", "inter", "band")
 FIELDS = [
     "cip_index",
     "query",
-    "query_m0",
-    "query_m1",
+    "query_community_0",
+    "query_community_1",
     "query_one_community",
     "skip_reason",
     "n_hebbian",
-    "n_modules",
+    "n_communities",
     "n_full",
     "n_intra",
     "n_inter",
@@ -65,10 +65,10 @@ FIELDS = [
 ]
 
 
-def membership_from_modules(modules: list) -> dict[str, int]:
+def membership_from_communities(communities: list) -> dict[str, int]:
     """Index is only a label within this CIP's community list."""
     membership: dict[str, int] = {}
-    for index, community in enumerate(modules or []):
+    for index, community in enumerate(communities or []):
         for atom in community:
             membership[str(atom)] = index
     return membership
@@ -113,10 +113,10 @@ def label_premise(
     ):
         return "unassigned"
     if one:
-        module = membership[query[0]]
-        if all(membership[leg] == module for leg in outside):
+        community = membership[query[0]]
+        if all(membership[leg] == community for leg in outside):
             return "intra"
-        if all(membership[leg] != module for leg in outside):
+        if all(membership[leg] != community for leg in outside):
             return "inter"
         return "unassigned"
     if any(membership[leg] == membership[qleg] for leg in outside for qleg in q_legs):
@@ -352,8 +352,8 @@ def run_community_sweep(
         with open(_hebbian_path(path, cip_index), encoding="utf-8") as handle:
             bank = json.load(handle)
         bank_edges = bank.get("edges") or []
-        modules = identify_modules(bank_edges)
-        membership = membership_from_modules(modules)
+        communities = identify_communities(bank_edges)
+        membership = membership_from_communities(communities)
         rows = premise_rank.kept_premises(snap, focus_cap)
         query = premise_rank._query_objects(snap)
         labels, indices, one, reason = label_rows(rows, query, membership)
@@ -377,7 +377,7 @@ def run_community_sweep(
             f"[community_aperture] cip={cip_index} n={len(rows)} "
             f"intra={counts['intra']} inter={counts['inter']} "
             f"bridge={counts['bridge']} unassigned={counts['unassigned']} "
-            f"modules={len(modules)} hebbian={len(bank_edges)} queries={len(jobs)}"
+            f"communities={len(communities)} hebbian={len(bank_edges)} queries={len(jobs)}"
         )
         parsed: dict = {}
         elapsed = 0.0
@@ -419,13 +419,13 @@ def run_community_sweep(
         records.append(
             {
                 "cip_index": cip_index,
-                "query": "Inheritance " + " ".join(query),
-                "query_m0": "" if indices[0] is None else indices[0],
-                "query_m1": "" if len(indices) < 2 or indices[1] is None else indices[1],
+                "query": premise_rank.query_label(snap),
+                "query_community_0": "" if indices[0] is None else indices[0],
+                "query_community_1": "" if len(indices) < 2 or indices[1] is None else indices[1],
                 "query_one_community": "true" if one else "false",
                 "skip_reason": reason,
                 "n_hebbian": len(bank_edges),
-                "n_modules": len(modules),
+                "n_communities": len(communities),
                 "n_full": len(rows),
                 "n_intra": counts["intra"],
                 "n_inter": counts["inter"],
@@ -482,8 +482,8 @@ def _load_labeled(path: Path, cip_index: int, focus_cap: int):
         snap = json.load(handle)
     with open(_hebbian_path(path, cip_index), encoding="utf-8") as handle:
         bank = json.load(handle)
-    modules = identify_modules(bank.get("edges") or [])
-    membership = membership_from_modules(modules)
+    communities = identify_communities(bank.get("edges") or [])
+    membership = membership_from_communities(communities)
     rows = premise_rank.kept_premises(snap, focus_cap)
     query = premise_rank._query_objects(snap)
     labels, _, _, reason = label_rows(rows, query, membership)

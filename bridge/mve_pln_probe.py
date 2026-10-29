@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -78,6 +79,19 @@ def _inject(body: str, closed_loop: bool, wage: float) -> str:
     return body
 
 
+def _reset_link_out(out: str) -> None:
+    """A link pass starts a new fund. It does not append to a previous one."""
+    root = Path(out)
+    if not root.is_absolute():
+        root = CAIRN / root
+    for name in ("fund.json", "protocol_probes.csv"):
+        (root / name).unlink(missing_ok=True)
+    for sub in ("probes", "wage", "accounts", "cells"):
+        folder = root / sub
+        if folder.is_dir():
+            shutil.rmtree(folder)
+
+
 def run_mve_with_probes(
     every: int = 2,
     focus_cap: int = 12,
@@ -85,8 +99,11 @@ def run_mve_with_probes(
     closed_loop: bool = False,
     wage: float = 200.0,
     export_only: bool = False,
-    modules: bool = False,
+    communities: bool = False,
+    link: bool = False,
+    release: str | None = None,
     out: str = "output/cognitive_synergy/mve_pln_probe",
+    encoder: str | None = None,
 ) -> int:
     if not MVE.is_file():
         print(f"[mve_pln_probe] missing {MVE}", file=sys.stderr)
@@ -103,7 +120,17 @@ def run_mve_with_probes(
     # Shared name with B2; DUMP_ONLY kept as env alias for older injects
     env["CAIRN_PLN_PROBE_EXPORT_ONLY"] = "1" if export_only else "0"
     env["CAIRN_PLN_PROBE_DUMP_ONLY"] = "1" if export_only else "0"
-    env["CAIRN_PLN_PROBE_MODULES"] = "1" if modules else "0"
+    env["CAIRN_PLN_PROBE_COMMUNITIES"] = "1" if communities else "0"
+    env["CAIRN_PLN_PROBE_LINK"] = "1" if link else "0"
+    # Open pass: no wage, and an exhausted link admits further atoms free inside k.
+    # Weighted and distracted stay the unpriced bridge arms.
+    env["CAIRN_LINK_ADMIT_FREE"] = "1" if link and not closed_loop else "0"
+    env["CAIRN_LINK_INFLUENCED_ONLY"] = "0"
+    env["CAIRN_LINK_RELEASE"] = release or ""
+    if encoder:
+        env["CAIRN_PLN_ENCODER"] = encoder
+    if link:
+        _reset_link_out(out)
     if "CAIRN_BRIDGE_TIMEOUT" not in env:
         env["CAIRN_BRIDGE_TIMEOUT"] = "180"
 
@@ -115,7 +142,9 @@ def run_mve_with_probes(
         tmp_path.write_text(body, encoding="utf-8")
         print(
             f"[mve_pln_probe] mve + probes every={every} k={focus_cap} B={budget} "
-            f"closed_loop={closed_loop} export_only={export_only} modules={modules}"
+            f"closed_loop={closed_loop} release={release or '-'} export_only={export_only} "
+            f"communities={communities} link={link} "
+            f"encoder={env.get('CAIRN_PLN_ENCODER') or 'Inheritance'}"
         )
         r = subprocess.run(
             ["bash", str(PETTA), tmp_path.name],
@@ -152,6 +181,8 @@ def main() -> int:
     sys.path.insert(0, str(CAIRN / "bridge"))
     import cip_probe  # noqa: E402
     import coupled  # noqa: E402
+    import link_fund  # noqa: E402
+    import pln_encoding  # noqa: E402
 
     ap = argparse.ArgumentParser(
         description=(
@@ -183,9 +214,26 @@ def main() -> int:
         help="export AF snapshots only (no PLN); same idea as B2 --export-only",
     )
     ap.add_argument(
-        "--modules",
+        "--communities",
         action="store_true",
         help="at each probed CIP, also write the whole Hebbian bank as cip_N.hebbian.json",
+    )
+    ap.add_argument(
+        "--link",
+        action="store_true",
+        help="price the influenced link (Milestone 3). Probes stay under --out",
+    )
+    ap.add_argument(
+        "--release",
+        choices=link_fund.RELEASE_MODES,
+        default=None,
+        help="drop bought atoms: absent, absent or STI 0 (dead), or dead else one per period",
+    )
+    ap.add_argument(
+        "--encoder",
+        choices=pln_encoding.LINK_TYPES,
+        default=None,
+        help="binary PLN form for Hebbian edges (default Inheritance)",
     )
     ap.add_argument(
         "--dump-only",
@@ -250,6 +298,7 @@ def main() -> int:
             )[0],
             mode=args.mode,
             out=args.out,
+            link=args.encoder,
         )
 
     if args.offline_grid:
@@ -269,6 +318,7 @@ def main() -> int:
             seed=args.seed,
             mode=args.mode,
             out=args.out,
+            link=args.encoder,
         )
 
     k = coupled.resolve_axis(
@@ -282,8 +332,11 @@ def main() -> int:
         closed_loop=args.closed_loop,
         wage=args.wage,
         export_only=bool(args.export_only or args.dump_only),
-        modules=args.modules,
+        communities=args.communities,
+        link=args.link,
+        release=args.release,
         out=args.out,
+        encoder=pln_encoding.normalize(args.encoder) if args.encoder else None,
     )
 
 

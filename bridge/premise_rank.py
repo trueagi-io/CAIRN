@@ -30,6 +30,7 @@ PETTA = CAIRN.parent / "PeTTa" / "run.sh"
 BRIDGE = CAIRN / "bridge"
 sys.path.insert(0, str(BRIDGE))
 
+import pln_encoding  # noqa: E402
 from scenario_from_snapshot import (  # noqa: E402
     _stv_from_sti,
     _top_focus,
@@ -126,16 +127,26 @@ def prefix_for_width(rows: list[dict], target: int, *, bottom: bool) -> list[dic
 
 
 def _query_objects(snap: dict) -> list[str]:
-    return [str(x) for x in ((snap.get("query") or {}).get("objects") or [])][:2]
+    return pln_encoding.query_objects(snap)
 
 
-def _kb_expr(rows: list[dict]) -> str:
+def query_label(snap: dict) -> str:
+    link = pln_encoding.link_of(snap)
+    objs = _query_objects(snap)
+    if len(objs) < 2:
+        return link
+    return pln_encoding.label(link, objs[0], objs[1])
+
+
+def _kb_expr(rows: list[dict], link: str) -> str:
     lines = []
     for row in rows:
         strength = max(0.05, min(0.95, float(row["weight"])))
         src, tgt = safe_sym(row["src"]), safe_sym(row["tgt"])
         lines.append(
-            f"(Sentence ((Inheritance {src} {tgt}) (stv {strength} {SENTENCE_CONF})) ({row['stamp']}))"
+            pln_encoding.sentence_atom(
+                link, src, tgt, strength, SENTENCE_CONF, row["stamp"]
+            )
         )
     body = "\n    ".join(lines) if lines else ""
     return f"(\n    {body}\n)" if body else "()"
@@ -159,7 +170,8 @@ def _prior_lines(snap: dict) -> str:
 
 def _metta_src(snap: dict, jobs: list[tuple[str, int, list[dict]]], budget: int) -> str:
     query = _query_objects(snap)
-    term = f"(Inheritance {safe_sym(query[0])} {safe_sym(query[1])})"
+    link = pln_encoding.link_of(snap)
+    term = pln_encoding.term(link, safe_sym(query[0]), safe_sym(query[1]))
     parts = [
         "!(import! &self boot)",
         "!(import! &self (library lib_pln))",
@@ -169,7 +181,7 @@ def _metta_src(snap: dict, jobs: list[tuple[str, int, list[dict]]], budget: int)
         kept = len(rows)
         parts.append(
             "!(let $ans (PLN.Query "
-            f"{_kb_expr(rows)} {term} {int(budget)})\n"
+            f"{_kb_expr(rows, link)} {term} {int(budget)})\n"
             f"     (println! (rank-result {end} {int(target)} {kept} $ans)))"
         )
     return "\n".join(parts) + "\n"
@@ -277,7 +289,7 @@ def run_premise_rank_sweep(
         with open(path, encoding="utf-8") as handle:
             snap = json.load(handle)
         rows = kept_premises(snap, focus_cap)
-        query = "Inheritance " + " ".join(_query_objects(snap))
+        query = query_label(snap)
         specs = _specs(rows, targets)
         jobs = _query_jobs(specs)
         print(

@@ -2,7 +2,7 @@
 ; CAIRN – Probe Metrics  (spec §3.3)
 ;
 ; Cognitive maintenance (mean AF Jaccard over CIP series) and
-; glocal coordination (√(local_coh × global_coh) on H-modules).
+; glocal coordination (√(local_coh × global_coh) on Hebbian communities).
 ;
 ; Depends on: tools/utils (average, pearson-correlation,
 ;             get-all-hlinks, get-hlink-source/target/probability,
@@ -14,7 +14,7 @@
 ;             -- caller must pre-import this, AFTER tools/utils
 ;             evaluation/assessment (measure-context-retention)
 ;             -- caller must pre-import this
-;             tools/utils.py (identify_modules, via py-call)
+;             tools/utils.py (identify_communities, via py-call)
 ; =============================================================
 
 ; ---- Private helpers ------------------------------------------
@@ -28,23 +28,23 @@
 (= (consecutive-pairs (cons $a (cons $b $rest)))
    (cons (pair $a $b) (consecutive-pairs (cons $b $rest))))
 
-; Index of the module (0-based) containing $atom, or -1 if none.
-; O(modules), early-exits on first match -- avoids the O(modules^2)
-; blowup of the spec's literal module-pairs/get-hlinks-between design.
-(= (module-index-of $atom () $i) -1)
-(= (module-index-of $atom (cons $m $ms) $i)
-   (if (member-expr $atom $m)
+; Index of the community (0-based) containing $atom, or -1 if none.
+; O(communities), early-exits on first match -- avoids the O(communities^2)
+; blowup of a per-pair link re-scan.
+(= (community-index-of $atom () $i) -1)
+(= (community-index-of $atom (cons $c $cs) $i)
+   (if (member-expr $atom $c)
        $i
-       (module-index-of $atom $ms (+ $i 1))))
+       (community-index-of $atom $cs (+ $i 1))))
 
-; A Hebbian link is inter-module iff its endpoints resolve to two
-; different (both-found) module indices. One pass over the links,
-; O(links x modules) total -- no per-pair link re-scan.
-(= (classify-link $link $modules)
+; A Hebbian link is inter-community iff its endpoints resolve to two
+; different (both-found) community indices. One pass over the links,
+; O(links x communities) total -- no per-pair link re-scan.
+(= (classify-link $link $communities)
    (let* (($src (get-hlink-source $link))
           ($tgt (get-hlink-target $link))
-          ($si  (module-index-of $src $modules 0))
-          ($ti  (module-index-of $tgt $modules 0)))
+          ($si  (community-index-of $src $communities 0))
+          ($ti  (community-index-of $tgt $communities 0)))
       (if (== $si $ti)
           (empty)
           (if (< $si 0)
@@ -53,8 +53,8 @@
                   (empty)
                   $link)))))
 
-(= (inter-module-links $links $modules)
-   (collapse (let $link (superpose $links) (classify-link $link $modules))))
+(= (inter-community-links $links $communities)
+   (collapse (let $link (superpose $links) (classify-link $link $communities))))
 
 ; (src tgt weight) — weight = Hebb STV mean, defaulted in Python if 0.
 (= (links-to-edges $links)
@@ -66,8 +66,8 @@
               ($src $tgt $w)))))
 
 ; Weighted Louvain (networkx) over all Hebbian links.
-(= (identify-modules $links)
-   (py-call (utils.identify_modules (links-to-edges $links))))
+(= (identify-communities $links)
+   (py-call (utils.identify_communities (links-to-edges $links))))
 
 ; ---- §3.3  Trajectory Test: Cognitive Maintenance -------------
 ; Average pairwise AF Jaccard similarity (measure-context-retention)
@@ -79,17 +79,17 @@
       (average $overlaps)))
 
 ; ---- §3.3  Coordination Test: Glocal Coordination --------------
-; Geometric mean of local (within-module) and global (cross-module,
+; Geometric mean of local (within-community) and global (cross-community,
 ; link-probability vs. temporal-conjunction correlation) coherence
 ; over the Hebbian-link community structure. Degrades to 0.0 when
-; there are 0 or 1 modules (average/pearson-correlation already
+; there are 0 or 1 communities (average/pearson-correlation already
 ; return 0.0 for empty input -- no extra guard needed).
 
 (= (measure-glocal-coordination)
    (let* (($all-links        (get-all-hlinks))
-          ($modules          (identify-modules $all-links))
-          ($local-coherence  (average (map-flat measure-coherence $modules)))
-          ($inter-links      (inter-module-links $all-links $modules))
+          ($communities      (identify-communities $all-links))
+          ($local-coherence  (average (map-flat measure-coherence $communities)))
+          ($inter-links      (inter-community-links $all-links $communities))
           ($link-probs       (map-flat (|-> ($l) (get-hlink-probability (get-hlink-source $l) (get-hlink-target $l))) $inter-links))
           ($conjunctions     (map-flat (|-> ($l) (temporal-conjunction (get-hlink-source $l) (get-hlink-target $l))) $inter-links))
           ($global-coherence (pearson-correlation $link-probs $conjunctions)))

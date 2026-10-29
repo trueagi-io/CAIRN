@@ -1,14 +1,22 @@
 """Generate bridge fx-* scenario files from a bridge_snapshot.json.
 
-Hebbian edges are dualed as Inheritance premises (PeTTa lib_pln syllogism
-is Inheritance-only). This is an operational encoding, not taxonomy.
+Hebbian edges are dualed as binary PLN premises. Inheritance is the default
+encoder. Implication and Similarity are the same two-atom shape. This is an
+operational encoding, not taxonomy.
 """
 
 from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
+
+_BRIDGE = Path(__file__).resolve().parent
+if str(_BRIDGE) not in sys.path:
+    sys.path.insert(0, str(_BRIDGE))
+
+import pln_encoding  # noqa: E402
 
 # Freeze-F: do not use full CIP AF as F — |S|=|F| would nearly equal V.
 # Top-STI focus keeps a scarce Cq∧AF control; weighted arm still sees all tables.
@@ -119,6 +127,8 @@ def generate(
     re_dynamics_cycles: int = DEFAULT_RE_DYNAMICS_CYCLES,
     budget: int = 10,
     protocol: str = "steering",
+    focus_atoms: list[str] | None = None,
+    link: str | None = None,
 ) -> dict:
     """Write <name>_map.metta and <name>_pln.metta. Returns paths + meta.
 
@@ -145,23 +155,29 @@ def generate(
     sti = {str(k): float(v) for k, v in (snap.get("sti") or {}).items()}
     edges = snap.get("edges") or []
     af_all = [str(a) for a in (snap.get("af") or [])]
-    query = snap.get("query") or {}
-    q_objs = [str(x) for x in (query.get("objects") or [])][:2]
+    link_name = pln_encoding.link_of(snap, link)
+    q_objs = pln_encoding.query_objects(snap)
     if len(q_objs) < 2:
         ranked = sorted(sti.keys(), key=lambda a: sti.get(a, 0.0), reverse=True)
         q_objs = (ranked + ["_a", "_b"])[:2]
 
-    # Ensure query atoms stay in focus for freeze-F (Cq needs Q∩F).
-    af_ranked = _top_focus(af_all, sti, focus_cap)
-    for q in q_objs:
-        if q not in af_ranked and q in set(af_all) | set(sti):
-            # replace lowest-STI slot if full
-            if len(af_ranked) >= focus_cap and af_ranked:
-                af_ranked = af_ranked[:-1]
-            if q not in af_ranked:
-                af_ranked.append(q)
-    if len(af_ranked) < 2:
-        af_ranked = list(dict.fromkeys(q_objs + af_ranked))[: max(2, focus_cap)]
+    # A priced link passes the atoms it held. Do not rebuild F as top-k,
+    # and do not put back atoms the fund did not hold.
+    priced = focus_atoms is not None
+    if priced:
+        af_ranked = list(dict.fromkeys(str(a) for a in focus_atoms if str(a)))
+    else:
+        # Ensure query atoms stay in focus for freeze-F (Cq needs Q∩F).
+        af_ranked = _top_focus(af_all, sti, focus_cap)
+        for q in q_objs:
+            if q not in af_ranked and q in set(af_all) | set(sti):
+                # replace lowest-STI slot if full
+                if len(af_ranked) >= focus_cap and af_ranked:
+                    af_ranked = af_ranked[:-1]
+                if q not in af_ranked:
+                    af_ranked.append(q)
+        if len(af_ranked) < 2:
+            af_ranked = list(dict.fromkeys(q_objs + af_ranked))[: max(2, focus_cap)]
 
     # symbol map over AF + edge endpoints + query
     nodes: set[str] = set()
@@ -172,6 +188,9 @@ def generate(
         nodes.add(str(a))
     for a in q_objs:
         nodes.add(str(a))
+    if priced:
+        for a in af_ranked:
+            nodes.add(str(a))
     nodes_list = sorted(nodes)
     sym = {n: _safe_sym(n) for n in nodes_list}
 
@@ -190,18 +209,20 @@ def generate(
         conf = 0.9
         stamp = i
         tables.append(
-            f"(Table {i} Inheritance (cons {sa} (cons {sb} ())) (stv {strength} {conf}) ({stamp}))"
+            pln_encoding.table_atom(i, link_name, sa, sb, strength, conf, stamp)
         )
         sentences.append(
-            f"(Sentence ((Inheritance {sa} {sb}) (stv {strength} {conf})) ({stamp}))"
+            pln_encoding.sentence_atom(link_name, sa, sb, strength, conf, stamp)
         )
 
     if len(tables) < MIN_EDGES:
         raise ValueError(f"snapshot unusable: too few valid edges ({len(tables)})")
 
     af_syms = [sym[a] for a in af_ranked if a in sym]
-    if len(af_syms) < 2:
+    if not priced and len(af_syms) < 2:
         af_syms = [sym[q_objs[0]], sym[q_objs[1]]]
+    if priced and not af_syms:
+        raise ValueError("snapshot unusable: priced focus is empty")
     q_syms = [sym[q_objs[0]], sym[q_objs[1]]]
     pool = [f'"{sym[n]}"' for n in nodes_list]
     obj_cons = _cons_atoms([sym[n] for n in nodes_list])
@@ -222,9 +243,10 @@ def generate(
     # Do not bake fx-out / fx-out-feedback here — driver_src always sets them
     # (avoids PeTTa multi-equality double-writes to wrong paths).
     map_body = f"""; Auto-generated from {snap_path.name} — do not edit by hand.
-; mode={mode} focus_cap={focus_cap} (AF export may be larger; F is top-STI)
+; mode={mode} focus_cap={focus_cap} encoder={link_name} priced={str(priced).lower()} (AF export may be larger)
 ; Output paths (fx-name / fx-out / fx-out-feedback) are set by run_bridge driver.
-(= (fx-query-label) "Inheritance {q_syms[0]} {q_syms[1]}")
+(= (fx-link) "{link_name}")
+(= (fx-query-label) "{pln_encoding.label(link_name, q_syms[0], q_syms[1])}")
 (= (fx-af-size) {af_size})
 (= (fx-cycles) {cycles})
 (= (fx-n-tables) {len(tables)})
@@ -234,7 +256,7 @@ def generate(
 (= (fx-objects) {obj_cons})
 (= (fx-pool) ({' '.join(pool)}))
 (= (fx-tables) {table_chain})
-(= (fx-query-term) (Inheritance {q_syms[0]} {q_syms[1]}))
+(= (fx-query-term) {pln_encoding.term(link_name, q_syms[0], q_syms[1])})
 (= (fx-query-objects) {qobj_cons})
 (= (fx-kb-full) {kb_full})
 """
@@ -266,6 +288,7 @@ def generate(
         "mode": mode,
         "protocol": proto,
         "source": source,
+        "link": link_name,
         "query": [q_syms[0], q_syms[1]],
         "focus": af_syms,
         "out_base": out_base,
@@ -273,6 +296,6 @@ def generate(
     print(
         f"[scenario_from_snapshot] wrote {map_path.name} "
         f"tables={len(tables)} focus={len(af_syms)}/{len(af_all)} "
-        f"mode={mode} k={focus_cap} B={budget}"
+        f"mode={mode} encoder={link_name} k={focus_cap} B={budget}"
     )
     return meta

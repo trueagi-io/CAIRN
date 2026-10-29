@@ -496,7 +496,7 @@ def count_undirected_cycles(edges):
     return betti_1
 
 
-def identify_modules(edges):
+def identify_communities(edges):
     """Weighted Louvain on undirected Hebbian graph. Edges (src,tgt) or
     (src,tgt,w); missing/nonpositive w → 0.5. resolution=1.01, seed=42."""
     G = nx.Graph()

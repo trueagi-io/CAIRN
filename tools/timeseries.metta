@@ -160,7 +160,7 @@
 
 ; Hebbian links where both endpoints are in $atoms.
 ; Uses member-expr (structural ==) -- suitable for MeTTa-side atom sets
-; such as module partitions from identify-modules.
+; such as community partitions from identify-communities.
 (= (get-hlinks-within $atoms)
    (collapse
       (let $link (superpose (get-all-hlinks))

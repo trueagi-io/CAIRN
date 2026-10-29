@@ -6,7 +6,7 @@
 ; Soft-fail: probe errors must not abort CIP (Python catches).
 ; Returns wage atom list (may be empty) for optional stimulate.
 (= (maybe-record-hebbian! $cip-index)
-   (let $want (py-call (cip_probe.modules_enabled))
+   (let $want (py-call (cip_probe.communities_enabled))
         (if (== $want True)
             (py-call (cip_probe.record_hebbian
                         $cip-index

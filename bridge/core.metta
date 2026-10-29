@@ -1,4 +1,4 @@
-; Protocol: Cq∧AF filter, seed, feedback wage. Table = (Table id Inheritance legs stv stamp)
+; Protocol: Cq∧AF filter, seed, feedback wage. Table = (Table id link legs stv stamp)
 
 (= (table-id (Table $id $_ $_ $_ $_)) $id)
 (= (table-legs (Table $_ $_ $legs $_ $_)) $legs)
@@ -21,7 +21,7 @@
        (cons $t (filter-tables $rest $Q $F))
        (filter-tables $rest $Q $F)))
 
-; Predicate is free (Inheritance for roman/slice; coupled uses Inheritance dual of Hebbian).
+; Predicate is the binary encoder (Inheritance by default; Implication and Similarity are the same shape).
 (= (table->sentence (Table $id $pred $legs $stv $stamp))
    (Sentence (($pred (car-atom $legs) (car-atom (cdr-atom $legs))) $stv) $stamp))
 

@@ -201,6 +201,8 @@ def run_steering_cell(
     seed: Optional[int] = DEFAULT_SEED,
     name: Optional[str] = None,
     protocol: str = "steering",
+    focus_atoms: Optional[list] = None,
+    link: Optional[str] = None,
 ) -> int:
     """One workshop cell — thin wrapper around run_from_snapshot (B2/B3 kernel)."""
     import run_bridge
@@ -213,6 +215,8 @@ def run_steering_cell(
         budget=budget,
         focus_cap=focus_cap,
         name=name,
+        focus_atoms=focus_atoms,
+        link=link,
     )
 
 

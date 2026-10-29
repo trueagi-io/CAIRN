@@ -62,15 +62,15 @@
             done)))
 
 ; ---- Community Detection (Louvain) ----------------------------
-; Round-trip shape check only (module membership / atom identity is
+; Round-trip shape check only (community membership / atom identity is
 ; covered more thoroughly in dev-tests/test_probe.metta). Asserting
-; on module COUNT, not on exact element order within/between modules:
+; on community count, not on exact element order within or between communities:
 ; Python set iteration order is not guaranteed stable across process
 ; runs (string hash randomization), even with a fixed Louvain seed.
 
-!(let $modules (py-call (utils.identify_modules ((a b) (b c) (a c) (x y) (y z) (x z))))
-   (assert-eq identify-modules-two-triangles 2 (size-atom $modules)))
+!(let $communities (py-call (utils.identify_communities ((a b) (b c) (a c) (x y) (y z) (x z))))
+   (assert-eq identify-communities-two-triangles 2 (size-atom $communities)))
 
-!(let $modules (py-call (utils.identify_modules
-                          ((a b 0.9) (b c 0.8) (a c 0.7) (x y 0.9) (y z 0.8) (x z 0.7))))
-   (assert-eq identify-modules-weighted-two-triangles 2 (size-atom $modules)))
+!(let $communities (py-call (utils.identify_communities
+                              ((a b 0.9) (b c 0.8) (a c 0.7) (x y 0.9) (y z 0.8) (x z 0.7))))
+   (assert-eq identify-communities-weighted-two-triangles 2 (size-atom $communities)))
